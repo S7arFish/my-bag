@@ -14,6 +14,9 @@
 	border-radius: 9999px;
 	transition: border-color 0.25s cubic-bezier(0.25, 0.46, 0.45, 0.94);
 	background-color: transparent !important;
+	font-size: 1.0625rem;
+	font-weight: 800;
+	letter-spacing: 0.005em;
 }
 
 .dropdown-container > a::before,
@@ -60,8 +63,8 @@
 }
 
 .navbar-trigger-icon svg {
-	width: 0.9rem;
-	height: 0.9rem;
+	width: 1rem;
+	height: 1rem;
 }
 
 /* 激活项保留原有宽度与间距，隐藏模板避免和浮动图标重叠。 */

@@ -23,6 +23,12 @@ import {
 	stepPhysics,
 	updateDragVelocity,
 } from "@/utils/about/reflow-engine";
+import { computeLiquidGlassOrbStyle } from "@/utils/about/liquid-glass";
+import {
+	attachRefractiveFilter,
+	type RefractiveFilterController,
+} from "@/utils/refractive/filter-controller";
+import { stepSpring, type SpringState } from "@/utils/refractive/spring";
 
 // ===== Props =====
 let { text = "" } = $props<{ text: string }>();
@@ -30,7 +36,9 @@ let { text = "" } = $props<{ text: string }>();
 // ===== DOM =====
 let canvas = $state<HTMLCanvasElement | null>(null);
 let container = $state<HTMLDivElement | null>(null);
+let glassShell = $state<HTMLDivElement | null>(null);
 let rafId = 0;
+let orbFilter: RefractiveFilterController | null = null;
 
 // ===== 渲染参数 =====
 let dpr = 1;
@@ -55,6 +63,11 @@ let paraLayouts: ParagraphLayout[] = [];
 // ===== 球体 =====
 let ball: BallState = createBall(40, 800, 600);
 let drag: DragState = createDragState();
+const ORB_VISUAL_SPRING = { mass: 1, stiffness: 160, damping: 16 };
+let orbScaleX: SpringState = { position: 1, velocity: 0 };
+let orbScaleY: SpringState = { position: 1, velocity: 0 };
+let orbRotation: SpringState = { position: 0, velocity: 0 };
+let lastVisualTime = performance.now();
 
 // ===== 3D 倾斜 =====
 let tiltX = 0;
@@ -78,6 +91,52 @@ function hitTest(mx: number, my: number): boolean {
 	const dx = mx - ball.x;
 	const dy = my - ball.y;
 	return dx * dx + dy * dy <= ball.radius * ball.radius;
+}
+
+function syncGlassShell(deltaSeconds = 1 / 60) {
+	if (!glassShell) return;
+	const style = computeLiquidGlassOrbStyle(ball, drag, dpr);
+	const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+	if (reducedMotion) {
+		orbScaleX = { position: 1, velocity: 0 };
+		orbScaleY = { position: 1, velocity: 0 };
+		orbRotation = { position: 0, velocity: 0 };
+	} else {
+		orbScaleX = stepSpring(
+			orbScaleX,
+			style.scaleX,
+			deltaSeconds,
+			ORB_VISUAL_SPRING,
+		);
+		orbScaleY = stepSpring(
+			orbScaleY,
+			style.scaleY,
+			deltaSeconds,
+			ORB_VISUAL_SPRING,
+		);
+		orbRotation = stepSpring(
+			orbRotation,
+			style.rotation,
+			deltaSeconds,
+			ORB_VISUAL_SPRING,
+		);
+	}
+	const renderedScaleX = Math.min(1.06, Math.max(0.97, orbScaleX.position));
+	const renderedScaleY = Math.min(1.06, Math.max(0.97, orbScaleY.position));
+	glassShell.style.setProperty("--orb-x", `${style.x}px`);
+	glassShell.style.setProperty("--orb-y", `${style.y}px`);
+	glassShell.style.setProperty("--orb-radius", `${style.radius}px`);
+	glassShell.style.setProperty("--orb-highlight-x", `${style.highlightX}%`);
+	glassShell.style.setProperty("--orb-highlight-y", `${style.highlightY}%`);
+	glassShell.style.setProperty("--orb-scale-x", renderedScaleX.toFixed(4));
+	glassShell.style.setProperty("--orb-scale-y", renderedScaleY.toFixed(4));
+	glassShell.style.setProperty(
+		"--orb-rotation",
+		`${Math.min(12, Math.max(-12, orbRotation.position)).toFixed(3)}deg`,
+	);
+	orbFilter?.setIntensity(style.intensity);
+	orbFilter?.setSpecularOpacity(0.4 + (style.intensity - 1) * 0.45);
+	glassShell.classList.toggle("is-dragging", drag.isDragging);
 }
 
 // ===== 预计算段落布局（在 resize 时调用） =====
@@ -273,7 +332,7 @@ function onDblClick(e: MouseEvent) {
 
 // ===== 主渲染循环 =====
 
-function render() {
+function render(time = performance.now()) {
 	if (!canvas || paraLayouts.length === 0) {
 		rafId = requestAnimationFrame(render);
 		return;
@@ -295,6 +354,9 @@ function render() {
 	if (!drag.isDragging) {
 		ball = stepPhysics(ball, 1, w, h);
 	}
+	const visualDelta = Math.max(0, (time - lastVisualTime) / 1000);
+	lastVisualTime = time;
+	syncGlassShell(visualDelta);
 
 	// 2. 清除
 	ctx.clearRect(0, 0, w, h);
@@ -470,6 +532,7 @@ function onResize() {
 	// 重新初始化球体
 	const radius = Math.min(canvasW, canvasH) * BALL_RATIO;
 	ball = createBall(radius, canvasW, canvasH);
+	syncGlassShell();
 }
 
 // ===== 生命周期 =====
@@ -479,6 +542,18 @@ let visibilityObserver: IntersectionObserver | null = null;
 
 onMount(() => {
 	onResize();
+	if (glassShell) {
+		orbFilter = attachRefractiveFilter(glassShell, {
+			radius: () => glassShell!.offsetWidth / 2,
+			bezelWidth: () => glassShell!.offsetWidth * 0.38,
+			blur: 0.25,
+			glassThickness: 58,
+			refractiveIndex: 1.5,
+			specularOpacity: 0.48,
+			specularAngle: -Math.PI / 4,
+			pixelRatio: Math.min(window.devicePixelRatio, 3),
+		});
+	}
 
 	ballImg = new Image();
 	ballImg.onload = () => {
@@ -506,6 +581,8 @@ onMount(() => {
 
 onDestroy(() => {
 	cancelAnimationFrame(rafId);
+	orbFilter?.destroy();
+	orbFilter = null;
 	window.removeEventListener("resize", onResize);
 	visibilityObserver?.disconnect();
 	clearCache();
@@ -525,4 +602,9 @@ onDestroy(() => {
 		onclick={onClick}
 		ondblclick={onDblClick}
 	></canvas>
+	<div
+		class="about-liquid-glass-orb"
+		bind:this={glassShell}
+		aria-hidden="true"
+	></div>
 </div>

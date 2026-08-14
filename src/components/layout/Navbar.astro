@@ -40,6 +40,25 @@ if (isLocalSrcLogo) {
 
 <div id="navbar" class="z-50">
 	<div class="navbar-segments">
+		<div class="navbar-refractive-surface" data-navbar-refractive aria-hidden="true"></div>
+		<div class="navbar-cap-optics navbar-cap-optics--left" data-navbar-cap-left aria-hidden="true"></div>
+		<div class="navbar-cap-optics navbar-cap-optics--right" data-navbar-cap-right aria-hidden="true"></div>
+		<svg class="navbar-fluid-clip-defs" aria-hidden="true" focusable="false">
+			<defs>
+				<clipPath id="navbar-soft-bubble-clip" clipPathUnits="userSpaceOnUse">
+					<path data-navbar-soft-bubble-path></path>
+				</clipPath>
+			</defs>
+		</svg>
+		<div class="navbar-fluid-surface" data-navbar-fluid aria-hidden="true">
+			<div class="navbar-fluid-optics" data-navbar-fluid-optics></div>
+		</div>
+		<svg class="navbar-fluid-rim" data-navbar-fluid-rim aria-hidden="true" focusable="false">
+			<path class="navbar-fluid-rim__stroke navbar-fluid-rim__stroke--cyan" data-navbar-fluid-rim-path></path>
+			<path class="navbar-fluid-rim__stroke navbar-fluid-rim__stroke--magenta" data-navbar-fluid-rim-path></path>
+			<path class="navbar-fluid-rim__stroke navbar-fluid-rim__stroke--gold" data-navbar-fluid-rim-path></path>
+			<path class="navbar-fluid-rim__stroke navbar-fluid-rim__stroke--white" data-navbar-fluid-rim-path></path>
+		</svg>
 		<!-- 左段：logo + 标题（滚动收缩成球） -->
 		<div class="navbar-seg navbar-seg--left">
 			<a href={url('/')} class="navbar-logo scale-animation flex items-center text-(--deep-text)">
@@ -100,6 +119,31 @@ if (isLocalSrcLogo) {
 
 <script>
 import { requestSearchModalToggle } from "@/utils/search-modal-controller";
+import {
+	computeNavbarCompactAnchors,
+	computeNavbarCompactShellWidth,
+	interpolateNavbarShellWidth,
+} from "@/utils/navbar-compact-layout";
+import { computeNavbarGlassProgress } from "@/utils/navbar-glass-progress";
+import { computeNavbarTensionTarget } from "@/utils/navbar-magnetic-tension";
+import {
+	createNavbarSoftBubblePath,
+	projectPointToRoundedRectBoundary,
+} from "@/utils/navbar-soft-bubble-geometry";
+import {
+	computeNavbarSoftBubbleVisuals,
+	createNavbarSoftBubbleMotionState,
+	navbarSoftBubbleMotionIsSettled,
+	stepNavbarSoftBubbleMotion,
+} from "@/utils/navbar-soft-bubble-motion";
+import {
+	NAVBAR_BASE_OPTICS,
+	NAVBAR_CAP_OPTICS,
+	NAVBAR_FLUID_OPTICS,
+	NAVBAR_TENSION_ACTIVATION_DISTANCE,
+} from "@/utils/navbar-optics";
+import { attachRefractiveFilter } from "@/utils/refractive/filter-controller";
+import { springIsSettled, stepSpring } from "@/utils/refractive/spring";
 
 let _hoverSliderAbortController: AbortController | null = null;
 let _hoverSliderMouseEnterHandlers: Array<[Element, (e: Event) => void]> = [];
@@ -491,32 +535,139 @@ function initNavbarScrollLayout() {
 	const navbarWrapper = document.getElementById('navbar-wrapper');
 	const segmentsNode = navbar.querySelector<HTMLElement>('.navbar-segments');
 	const centerNode = navbar.querySelector<HTMLElement>('.navbar-seg--center');
-	if (!segmentsNode || !centerNode) return;
+	const glassLayer = navbar.querySelector<HTMLElement>('[data-navbar-refractive]');
+	const fluidLayer = navbar.querySelector<HTMLElement>('[data-navbar-fluid]');
+	const fluidOpticsLayer = navbar.querySelector<HTMLElement>('[data-navbar-fluid-optics]');
+	const leftCapLayer = navbar.querySelector<HTMLElement>('[data-navbar-cap-left]');
+	const rightCapLayer = navbar.querySelector<HTMLElement>('[data-navbar-cap-right]');
+	const fluidPath = navbar.querySelector<SVGPathElement>('[data-navbar-soft-bubble-path]');
+	const fluidRimPaths = Array.from(
+		navbar.querySelectorAll<SVGPathElement>('[data-navbar-fluid-rim-path]'),
+	);
+	if (
+		!segmentsNode ||
+		!centerNode ||
+		!glassLayer ||
+		!fluidLayer ||
+		!fluidOpticsLayer ||
+		!leftCapLayer ||
+		!rightCapLayer ||
+		!fluidPath ||
+		fluidRimPaths.length === 0
+	) return;
 	const segments = segmentsNode as HTMLElement;
 	const center = centerNode as HTMLElement;
+	const fluidPathElement = fluidPath;
 
 	const SCROLL_IN = 80;
 	const SCROLL_OUT = 40;
-	const COMPACT_GAP = 8;
+	const COMPACT_SIZE = 36;
+	const COMPACT_INSET = 40;
 	const desktopMedia = window.matchMedia('(min-width: 1024px)');
+	const reducedMotionMedia = window.matchMedia('(prefers-reduced-motion: reduce)');
+	const finePointerMedia = window.matchMedia('(hover: hover) and (pointer: fine)');
+	const springConfig = { mass: 1, stiffness: 190, damping: 15.5 };
+	const TENSION_RANGE = NAVBAR_TENSION_ACTIVATION_DISTANCE;
+	const BUBBLE_MAX_DEPTH = 26;
+	const BUBBLE_INFLUENCE_WIDTH = 320;
+	const FLUID_INSET = 26;
+	const supportsFluidClip = CSS.supports('clip-path', 'url("#navbar-soft-bubble-clip")');
 	const abortController = new AbortController();
 	const { signal } = abortController;
 	let isCompact = navbar.classList.contains('scrolled');
 	let scrollFrame: number | null = null;
 	let layoutFrame: number | null = null;
+	let glassFrame: number | null = null;
+	let glassTarget = computeNavbarGlassProgress(window.scrollY);
+	let glassState = { position: glassTarget, velocity: 0 };
+	let glassPreviousTime = performance.now();
+	let tensionFrame: number | null = null;
+	let tensionPreviousTime = performance.now();
+	let latestPointer = { x: Number.NaN, y: Number.NaN };
+	let tensionShellSize = { width: 1, height: 76 };
+	let tensionTarget = {
+		x: 0.5,
+		y: 0.5,
+		normalX: 0,
+		normalY: 0,
+		strength: 0,
+	};
+	let tensionState = createNavbarSoftBubbleMotionState(tensionTarget);
+	let expandedShellWidth = 0;
+	let compactShellWidth = 0;
+	const navbarFilter = attachRefractiveFilter(glassLayer, {
+		radius: () => glassLayer.getBoundingClientRect().height / 2,
+		bezelWidth: 24,
+		blur: 0.54,
+		glassThickness: NAVBAR_BASE_OPTICS.glassThickness,
+		refractiveIndex: NAVBAR_BASE_OPTICS.refractiveIndex,
+		specularOpacity: NAVBAR_BASE_OPTICS.specularOpacity,
+		specularAngle: (-Math.PI * 55) / 180,
+		chromaticAberration: NAVBAR_BASE_OPTICS.chromaticAberration,
+		pixelRatio: Math.min(window.devicePixelRatio, 3),
+	});
+	const fluidFilter = attachRefractiveFilter(fluidOpticsLayer, {
+		radius: 38,
+		bezelWidth: 27,
+		blur: 0.5,
+		glassThickness: NAVBAR_FLUID_OPTICS.glassThickness,
+		refractiveIndex: NAVBAR_FLUID_OPTICS.refractiveIndex,
+		specularOpacity: NAVBAR_FLUID_OPTICS.specularOpacity,
+		specularAngle: (-Math.PI * 62) / 180,
+		chromaticAberration: NAVBAR_FLUID_OPTICS.chromaticAberration,
+		pixelRatio: Math.min(window.devicePixelRatio, 3),
+	});
+	const createCapFilter = (layer: HTMLElement, angle: number) =>
+		attachRefractiveFilter(layer, {
+			radius: () => layer.getBoundingClientRect().height / 2,
+			bezelWidth: 29,
+			blur: 0.42,
+			glassThickness: NAVBAR_CAP_OPTICS.glassThickness,
+			refractiveIndex: NAVBAR_CAP_OPTICS.refractiveIndex,
+			specularOpacity: NAVBAR_CAP_OPTICS.specularOpacity,
+			specularAngle: angle,
+			chromaticAberration: NAVBAR_CAP_OPTICS.chromaticAberration,
+			pixelRatio: Math.min(window.devicePixelRatio, 3),
+		});
+	const leftCapFilter = createCapFilter(leftCapLayer, (-Math.PI * 42) / 180);
+	const rightCapFilter = createCapFilter(rightCapLayer, (-Math.PI * 138) / 180);
+
+	function measureShellWidths() {
+		const navbarWidth = navbar.getBoundingClientRect().width;
+		const computedMaxWidth = Number.parseFloat(
+			window.getComputedStyle(segments).maxWidth,
+		);
+		expandedShellWidth = Number.isFinite(computedMaxWidth)
+			? Math.min(navbarWidth, computedMaxWidth)
+			: navbarWidth;
+		const minimumShellWidth = Math.min(
+			expandedShellWidth,
+			center.scrollWidth + 2 * (COMPACT_SIZE + 56),
+		);
+		compactShellWidth = computeNavbarCompactShellWidth(
+			expandedShellWidth,
+			window.innerWidth,
+			minimumShellWidth,
+			0.82,
+		);
+	}
 
 	function updateCompactLayout() {
 		if (!isCompact || !desktopMedia.matches) return;
 
 		const segmentsRect = segments.getBoundingClientRect();
-		const centerRect = center.getBoundingClientRect();
+		const anchors = computeNavbarCompactAnchors(
+			segmentsRect.width,
+			COMPACT_SIZE,
+			COMPACT_INSET,
+		);
 		navbar.style.setProperty(
 			'--navbar-compact-left',
-			`${centerRect.left - segmentsRect.left - COMPACT_GAP}px`,
+			`${anchors.left}px`,
 		);
 		navbar.style.setProperty(
 			'--navbar-compact-right',
-			`${centerRect.right - segmentsRect.left + COMPACT_GAP}px`,
+			`${anchors.right}px`,
 		);
 	}
 
@@ -539,19 +690,264 @@ function initNavbarScrollLayout() {
 		navbarWrapper?.classList.toggle('navbar-scrolled', isCompact);
 		// 状态切换发生在滚动 rAF 内，立即测量可避免先渲染一帧错误锚点。
 		updateCompactLayout();
+		syncTensionTarget();
+		startTensionAnimation();
+	}
+
+	function renderGlassState() {
+		const springPosition = Number.isFinite(glassState.position)
+			? glassState.position
+			: glassTarget;
+		const progress = Math.min(1, Math.max(0, springPosition));
+		const velocity = Number.isFinite(glassState.velocity) ? glassState.velocity : 0;
+		const energy = Math.min(1, Math.abs(velocity) * 0.14);
+		const boundaryOvershoot = Math.min(
+			0.12,
+			Math.abs(springPosition - progress),
+		);
+		const filterIntensity = Math.min(
+			2.18,
+			Math.max(
+				0,
+				progress * 1.68 + velocity * 0.07 + boundaryOvershoot * 2.15,
+			),
+		);
+		const scaleX =
+			0.98 + progress * 0.02 + energy * 0.018 + boundaryOvershoot * 0.18;
+		const scaleY =
+			0.955 + progress * 0.045 - energy * 0.01 - boundaryOvershoot * 0.08;
+		navbar.style.setProperty('--navbar-glass-progress', springPosition.toFixed(4));
+		navbar.style.setProperty('--navbar-glass-velocity', velocity.toFixed(4));
+		navbar.style.setProperty('--navbar-glass-energy', energy.toFixed(4));
+		navbar.style.setProperty('--navbar-glass-scale-x', scaleX.toFixed(4));
+		navbar.style.setProperty('--navbar-glass-scale-y', scaleY.toFixed(4));
+		if (desktopMedia.matches) {
+			const shellWidth = interpolateNavbarShellWidth(
+				expandedShellWidth,
+				compactShellWidth,
+				springPosition,
+			);
+			navbar.style.setProperty(
+				'--navbar-shell-width',
+				`${shellWidth.toFixed(2)}px`,
+			);
+		} else {
+			navbar.style.removeProperty('--navbar-shell-width');
+		}
+		navbarFilter.setIntensity(filterIntensity);
+		navbarFilter.setSpecularOpacity(
+			0.62 + progress * 0.48 + energy * 0.24 + boundaryOvershoot * 0.9,
+		);
+		const capIntensity = Math.min(2.62, filterIntensity * 1.18);
+		leftCapFilter.setIntensity(capIntensity);
+		rightCapFilter.setIntensity(capIntensity);
+		const capSpecular = Math.min(
+			1.42,
+			0.72 + progress * 0.56 + energy * 0.28 + boundaryOvershoot,
+		);
+		leftCapFilter.setSpecularOpacity(capSpecular);
+		rightCapFilter.setSpecularOpacity(capSpecular);
+	}
+
+	function animateGlass(time: number) {
+		glassFrame = null;
+		if (reducedMotionMedia.matches) {
+			glassState = { position: glassTarget, velocity: 0 };
+			renderGlassState();
+			return;
+		}
+		const deltaSeconds = Math.max(0, (time - glassPreviousTime) / 1000);
+		glassPreviousTime = time;
+		glassState = stepSpring(
+			glassState,
+			glassTarget,
+			deltaSeconds,
+			springConfig,
+		);
+		if (springIsSettled(glassState, glassTarget)) {
+			glassState = { position: glassTarget, velocity: 0 };
+			renderGlassState();
+			return;
+		}
+		renderGlassState();
+		glassFrame = requestAnimationFrame(animateGlass);
+	}
+
+	function startGlassAnimation() {
+		if (glassFrame !== null) return;
+		glassPreviousTime = performance.now();
+		glassFrame = requestAnimationFrame(animateGlass);
+	}
+
+	function syncGlassTarget(immediate = false) {
+		glassTarget = computeNavbarGlassProgress(window.scrollY);
+		if (immediate || reducedMotionMedia.matches) {
+			glassState = { position: glassTarget, velocity: 0 };
+			renderGlassState();
+			return;
+		}
+		startGlassAnimation();
+	}
+
+	function syncTensionTarget() {
+		const rect = segments.getBoundingClientRect();
+		tensionShellSize = { width: rect.width, height: rect.height };
+		const target = computeNavbarTensionTarget({
+			pointerX: latestPointer.x,
+			pointerY: latestPointer.y,
+			rect,
+			radius: rect.height / 2,
+			activationDistance: TENSION_RANGE,
+			maxExtension: BUBBLE_MAX_DEPTH,
+			enabled:
+				isCompact &&
+				supportsFluidClip &&
+				desktopMedia.matches &&
+				finePointerMedia.matches &&
+				!reducedMotionMedia.matches,
+		});
+		if (target.active) {
+			tensionTarget.x = target.hotspotX;
+			tensionTarget.y = target.hotspotY;
+			tensionTarget.normalX = target.normalX;
+			tensionTarget.normalY = target.normalY;
+		}
+		tensionTarget.strength = target.strength;
+	}
+
+	function renderTensionState() {
+		const visuals = computeNavbarSoftBubbleVisuals(tensionState);
+		const hotspotX = Math.max(0, Math.min(1, tensionState.x.position));
+		const hotspotY = Math.max(0, Math.min(1, tensionState.y.position));
+		const projection = projectPointToRoundedRectBoundary({
+			pointX: hotspotX * tensionShellSize.width,
+			pointY: hotspotY * tensionShellSize.height,
+			width: tensionShellSize.width,
+			height: tensionShellSize.height,
+			radius: tensionShellSize.height / 2,
+		});
+		const path = createNavbarSoftBubblePath({
+			width: tensionShellSize.width,
+			height: tensionShellSize.height,
+			radius: tensionShellSize.height / 2,
+			inset: FLUID_INSET,
+			centerT: projection.perimeterT,
+			depth: visuals.depth,
+			influenceWidth: visuals.influenceWidth || BUBBLE_INFLUENCE_WIDTH,
+			shoulder: visuals.shoulder,
+			sampleCount: 192,
+		});
+		fluidPathElement.setAttribute('d', path);
+		fluidRimPaths.forEach((rimPath) => rimPath.setAttribute('d', path));
+		navbar.style.setProperty(
+			'--navbar-fluid-hotspot-x',
+			`${(projection.x + FLUID_INSET).toFixed(3)}px`,
+		);
+		navbar.style.setProperty(
+			'--navbar-fluid-hotspot-y',
+			`${(projection.y + FLUID_INSET).toFixed(3)}px`,
+		);
+		navbar.style.setProperty(
+			'--navbar-fluid-normal-x',
+			projection.normalX.toFixed(4),
+		);
+		navbar.style.setProperty(
+			'--navbar-fluid-normal-y',
+			projection.normalY.toFixed(4),
+		);
+		navbar.style.setProperty(
+			'--navbar-fluid-presence',
+			visuals.presence.toFixed(4),
+		);
+		navbar.style.setProperty(
+			'--navbar-fluid-depth',
+			`${visuals.depth.toFixed(3)}px`,
+		);
+		fluidFilter.setIntensity(
+			Math.min(
+				2.75,
+				1.48 + visuals.opticalEnergy * 1.27,
+			),
+		);
+		fluidFilter.setSpecularOpacity(
+			Math.min(
+				1.38,
+				0.82 + visuals.opticalEnergy * 0.56,
+			),
+		);
+	}
+
+	function animateTension(time: number) {
+		tensionFrame = null;
+		const deltaSeconds = Math.max(
+			0,
+			(time - tensionPreviousTime) / 1000,
+		);
+		tensionPreviousTime = time;
+		tensionState = stepNavbarSoftBubbleMotion(
+			tensionState,
+			tensionTarget,
+			deltaSeconds,
+		);
+		renderTensionState();
+		const settled = navbarSoftBubbleMotionIsSettled(tensionState, tensionTarget);
+		if (settled) {
+			tensionState = createNavbarSoftBubbleMotionState(tensionTarget);
+			renderTensionState();
+			return;
+		}
+		tensionFrame = requestAnimationFrame(animateTension);
+	}
+
+	function startTensionAnimation() {
+		if (tensionFrame !== null) return;
+		tensionPreviousTime = performance.now();
+		tensionFrame = requestAnimationFrame(animateTension);
+	}
+
+	function releaseTension() {
+		latestPointer = { x: Number.NaN, y: Number.NaN };
+		tensionTarget.strength = 0;
+		startTensionAnimation();
 	}
 
 	function handleScroll() {
 		if (scrollFrame !== null) return;
 		scrollFrame = requestAnimationFrame(() => {
 			scrollFrame = null;
+			syncGlassTarget();
 			syncCompactState();
 		});
 	}
 
 	window.addEventListener('scroll', handleScroll, { passive: true, signal });
-	window.addEventListener('resize', scheduleCompactLayout, { passive: true, signal });
-	document.addEventListener('astro:page-load', syncCompactState, { signal });
+	if (finePointerMedia.matches) {
+		window.addEventListener('pointermove', (event) => {
+			latestPointer = { x: event.clientX, y: event.clientY };
+			syncTensionTarget();
+			startTensionAnimation();
+		}, { passive: true, signal });
+		window.addEventListener('pointerleave', releaseTension, { signal });
+	}
+	window.addEventListener('blur', releaseTension, { signal });
+	document.addEventListener('visibilitychange', () => {
+		if (document.hidden) releaseTension();
+	}, { signal });
+	window.addEventListener('resize', () => {
+		measureShellWidths();
+		renderGlassState();
+		scheduleCompactLayout();
+		navbarFilter.rebuild();
+		fluidFilter.rebuild();
+		leftCapFilter.rebuild();
+		rightCapFilter.rebuild();
+		syncTensionTarget();
+		startTensionAnimation();
+	}, { passive: true, signal });
+	document.addEventListener('astro:page-load', () => {
+		syncGlassTarget();
+		syncCompactState();
+	}, { signal });
 
 	const resizeObserver = new ResizeObserver(scheduleCompactLayout);
 	resizeObserver.observe(segments);
@@ -560,17 +956,27 @@ function initNavbarScrollLayout() {
 	const cleanup = () => {
 		abortController.abort();
 		resizeObserver.disconnect();
+		navbarFilter.destroy();
+		fluidFilter.destroy();
+		leftCapFilter.destroy();
+		rightCapFilter.destroy();
 		if (scrollFrame !== null) cancelAnimationFrame(scrollFrame);
 		if (layoutFrame !== null) cancelAnimationFrame(layoutFrame);
+		if (glassFrame !== null) cancelAnimationFrame(glassFrame);
+		if (tensionFrame !== null) cancelAnimationFrame(tensionFrame);
 		if (runtimeWindow.__navbarScrollLayoutCleanup === cleanup) {
 			delete runtimeWindow.__navbarScrollLayoutCleanup;
 		}
 	};
 	runtimeWindow.__navbarScrollLayoutCleanup = cleanup;
 
+	measureShellWidths();
+	syncGlassTarget(true);
 	syncCompactState();
 	navbarWrapper?.classList.toggle('navbar-scrolled', isCompact);
 	updateCompactLayout();
+	syncTensionTarget();
+	renderTensionState();
 }
 
 initNavbarScrollLayout();

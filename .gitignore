@@ -41,3 +41,10 @@ package/
 .obsidian/
 
 CLAUDE.md
+
+# local development and Codex artifacts
+.playwright-cli/
+output/
+design-qa.md
+docs/superpowers/
+src/个人博客4.0/

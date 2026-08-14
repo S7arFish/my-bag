@@ -26,3 +26,117 @@
 .about-canvas-wrap canvas.is-dragging {
 	cursor: grabbing;
 }
+
+.about-liquid-glass-orb {
+	--orb-x: 50%;
+	--orb-y: 50%;
+	--orb-radius: 48px;
+	--orb-highlight-x: 50%;
+	--orb-highlight-y: 36%;
+	--orb-scale-x: 1;
+	--orb-scale-y: 1;
+	--orb-rotation: 0deg;
+	position: absolute;
+	left: 0;
+	top: 0;
+	z-index: 2;
+	width: calc(var(--orb-radius) * 2);
+	height: calc(var(--orb-radius) * 2);
+	border-radius: 50%;
+	pointer-events: none;
+	transform: translate3d(
+		calc(var(--orb-x) - var(--orb-radius)),
+		calc(var(--orb-y) - var(--orb-radius)),
+		0
+	) rotate(var(--orb-rotation)) scaleX(var(--orb-scale-x)) scaleY(var(--orb-scale-y));
+	-webkit-backdrop-filter: blur(0.6px) saturate(1.16);
+	backdrop-filter: blur(0.6px) saturate(1.16);
+	background:
+		radial-gradient(
+			circle at var(--orb-highlight-x) var(--orb-highlight-y),
+			rgba(255, 255, 255, 0.27),
+			rgba(255, 255, 255, 0.06) 18%,
+			transparent 38%
+		),
+		linear-gradient(
+			145deg,
+			rgba(239, 248, 255, 0.1),
+			rgba(105, 155, 255, 0.035) 58%,
+			rgba(3, 11, 28, 0.075)
+		);
+	box-shadow:
+		inset 0 1px 2px rgba(255, 255, 255, 0.7),
+		inset 1px 0 3px rgba(176, 218, 255, 0.2),
+		inset 0 -2px 5px rgba(22, 36, 70, 0.2),
+		0 8px 24px rgba(0, 0, 0, 0.14);
+	will-change: transform;
+	transition: box-shadow 160ms ease;
+}
+
+.about-liquid-glass-orb::before,
+.about-liquid-glass-orb::after {
+	content: "";
+	position: absolute;
+	inset: 0;
+	border-radius: inherit;
+	pointer-events: none;
+}
+
+.about-liquid-glass-orb::before {
+	background: linear-gradient(
+		150deg,
+		rgba(255, 255, 255, 0.46) 0%,
+		transparent 28%,
+		transparent 72%,
+		rgba(84, 137, 208, 0.16) 100%
+	);
+	box-shadow:
+		inset 0 0 0 1px rgba(232, 246, 255, 0.34),
+		inset 0 0 16px rgba(151, 201, 255, 0.08);
+}
+
+.about-liquid-glass-orb::after {
+	inset: 5%;
+	background: radial-gradient(
+		circle at 30% 22%,
+		rgba(255, 255, 255, 0.26),
+		transparent 22%
+	);
+	filter: blur(1px);
+}
+
+.about-liquid-glass-orb.is-dragging {
+	box-shadow:
+		inset 0 1px 2px rgba(255, 255, 255, 0.78),
+		inset 1px 0 4px rgba(176, 218, 255, 0.24),
+		inset 0 -2px 6px rgba(22, 36, 70, 0.22),
+		0 12px 30px rgba(0, 0, 0, 0.18);
+}
+
+:root:not(.dark) .about-liquid-glass-orb {
+	background:
+		radial-gradient(
+			circle at var(--orb-highlight-x) var(--orb-highlight-y),
+			rgba(255, 255, 255, 0.4),
+			rgba(255, 255, 255, 0.1) 18%,
+			transparent 38%
+		),
+		linear-gradient(
+			145deg,
+			rgba(255, 255, 255, 0.16),
+			rgba(117, 177, 238, 0.04) 58%,
+			rgba(72, 102, 134, 0.08)
+		);
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.about-liquid-glass-orb,
+	.about-liquid-glass-orb.is-dragging {
+		transition: none;
+		transform: translate3d(
+			calc(var(--orb-x) - var(--orb-radius)),
+			calc(var(--orb-y) - var(--orb-radius)),
+			0
+		) rotate(0deg) scale(1);
+	}
+}

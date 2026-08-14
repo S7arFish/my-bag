@@ -7,20 +7,20 @@ const SITE_LANG = "zh_CN";
 
 export const siteConfig: SiteConfig = {
 	// 站点标题
-	title: "MmzMing的博客",
+	title: "MiNi飞飞的博客",
 
 	// 站点副标题
-	subtitle: "MmzMing",
+	subtitle: "MiNi飞飞",
 
 	// 站点 URL
 	site_url: "https://tblog.mmzhiku.xyz",
 
 	// 站点描述
-	description: "mmzming的博客，记录个人学习、工作、AI相关的内容",
+	description: "mini飞飞的博客，记录个人学习、工作、AI相关的内容",
 
 	// 站点关键词
 	keywords: [
-		"MmzMing",
+		"MiNi飞飞",
 		"JAVA",
 		"AI",
 		"Astro",
@@ -111,7 +111,7 @@ export const siteConfig: SiteConfig = {
 			alt: "logo",
 		},
 		// 导航栏标题
-		title: "MmzMing的博客",
+		title: "MiNi飞飞的博客",
 		// 全宽导航栏，导航栏是否占满屏幕宽度
 		widthFull: false,
 	},
