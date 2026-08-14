@@ -156,9 +156,9 @@ export const siteConfig: SiteConfig = {
 		// 友链页面开关
 		friends: true,
 		// 赞助页面开关
-		sponsor: true,
+		sponsor: false,
 		// 留言板页面开关，需要配置评论系统
-		guestbook: true,
+		guestbook: false,
 		// 相册页面开关
 		gallery: true,
 		// 收藏API页面开关
@@ -184,15 +184,15 @@ export const siteConfig: SiteConfig = {
 		microsoftClarityId: "",
 		// Umami 统计配置
 		umamiAnalytics: {
-			websiteId: "5907656e-d254-4c9e-ad73-5ce40bf184bb",
-			shareId: "uAfsjwbIKgVPjxtc",
-			scriptUrl: "https://stats.mmzhiku.xyz/script.js",
+			websiteId: "",
+			shareId: "",
+			scriptUrl: "",
 			// 使用 Umami 的 PV 展示文章详情、列表与网格浏览量；启用时优先于评论系统统计
 			pageviews: {
-				enabled: true,
+				enabled: false,
 			},
 			// 是否追踪出站链接
-			trackOutboundLinks: true,
+			trackOutboundLinks: false,
 			// 是否收集浏览器性能指标
 			collectWebVitals: false,
 			// 会话回放配置

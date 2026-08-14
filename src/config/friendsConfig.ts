@@ -16,8 +16,7 @@ export const friendsPageConfig: FriendsPageConfig = {
 
 	// 友链申请链接，填写后会在友链页面显示申请按钮
 	// 使用模板参数直接跳转到友链申请模板
-	applyLink:
-		"https://github.com/MmzMing/my-blog/issues/new?template=friend-link.yml",
+	applyLink: "",
 
 	// 本站信息，用于友链申请指南弹窗中的站点信息展示
 	siteInfo: {
