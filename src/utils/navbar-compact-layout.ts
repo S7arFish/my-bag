@@ -3,6 +3,12 @@ export interface NavbarCompactAnchors {
 	right: number;
 }
 
+export interface NavbarScrollTransform {
+	shellScaleX: number;
+	shellInset: number;
+	sideOffset: number;
+}
+
 export function computeNavbarCompactShellWidth(
 	shellWidth: number,
 	viewportWidth: number,
@@ -33,9 +39,35 @@ export function interpolateNavbarShellWidth(
 		? Math.max(-0.08, Math.min(progress, 1.1))
 		: 0;
 	return (
-		safeExpandedWidth +
-		(safeCompactWidth - safeExpandedWidth) * safeProgress
+		safeExpandedWidth + (safeCompactWidth - safeExpandedWidth) * safeProgress
 	);
+}
+
+export function computeNavbarScrollTransform(
+	expandedWidth: number,
+	compactWidth: number,
+	progress: number,
+	compactInset: number,
+): NavbarScrollTransform {
+	const safeExpandedWidth = Math.max(0, expandedWidth);
+	const safeProgress = Number.isFinite(progress)
+		? Math.max(-0.08, Math.min(progress, 1.1))
+		: 0;
+	const visualWidth = interpolateNavbarShellWidth(
+		safeExpandedWidth,
+		compactWidth,
+		safeProgress,
+	);
+	const shellInset = (safeExpandedWidth - visualWidth) / 2;
+	const sideOffset = shellInset + Math.max(0, compactInset) * safeProgress;
+	const round = (value: number) => Math.round(value * 1_000_000) / 1_000_000;
+
+	return {
+		shellScaleX:
+			safeExpandedWidth > 0 ? round(visualWidth / safeExpandedWidth) : 1,
+		shellInset: round(shellInset),
+		sideOffset: round(sideOffset),
+	};
 }
 
 export function computeNavbarCompactAnchors(
@@ -44,7 +76,10 @@ export function computeNavbarCompactAnchors(
 	inset: number,
 ): NavbarCompactAnchors {
 	const safeShellWidth = Math.max(0, shellWidth);
-	const safeCompactWidth = Math.max(0, Math.min(compactWidth, safeShellWidth / 2));
+	const safeCompactWidth = Math.max(
+		0,
+		Math.min(compactWidth, safeShellWidth / 2),
+	);
 	const maxInset = Math.max(0, (safeShellWidth - safeCompactWidth * 2) / 2);
 	const safeInset = Math.max(0, Math.min(inset, maxInset));
 	return {

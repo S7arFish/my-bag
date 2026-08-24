@@ -120,9 +120,8 @@ if (isLocalSrcLogo) {
 <script>
 import { requestSearchModalToggle } from "@/utils/search-modal-controller";
 import {
-	computeNavbarCompactAnchors,
 	computeNavbarCompactShellWidth,
-	interpolateNavbarShellWidth,
+	computeNavbarScrollTransform,
 } from "@/utils/navbar-compact-layout";
 import { computeNavbarGlassProgress } from "@/utils/navbar-glass-progress";
 import { computeNavbarTensionTarget } from "@/utils/navbar-magnetic-tension";
@@ -576,7 +575,7 @@ function initNavbarScrollLayout() {
 	const { signal } = abortController;
 	let isCompact = navbar.classList.contains('scrolled');
 	let scrollFrame: number | null = null;
-	let layoutFrame: number | null = null;
+	let measureFrame: number | null = null;
 	let glassFrame: number | null = null;
 	let glassTarget = computeNavbarGlassProgress(window.scrollY);
 	let glassState = { position: glassTarget, velocity: 0 };
@@ -650,32 +649,28 @@ function initNavbarScrollLayout() {
 			minimumShellWidth,
 			0.82,
 		);
-	}
-
-	function updateCompactLayout() {
-		if (!isCompact || !desktopMedia.matches) return;
-
-		const segmentsRect = segments.getBoundingClientRect();
-		const anchors = computeNavbarCompactAnchors(
-			segmentsRect.width,
-			COMPACT_SIZE,
-			COMPACT_INSET,
+		const compactShellInset = Math.max(
+			0,
+			(expandedShellWidth - compactShellWidth) / 2,
 		);
 		navbar.style.setProperty(
-			'--navbar-compact-left',
-			`${anchors.left}px`,
+			'--navbar-compact-shell-width',
+			`${compactShellWidth.toFixed(2)}px`,
 		);
 		navbar.style.setProperty(
-			'--navbar-compact-right',
-			`${anchors.right}px`,
+			'--navbar-compact-shell-inset',
+			`${compactShellInset.toFixed(2)}px`,
 		);
 	}
 
-	function scheduleCompactLayout() {
-		if (layoutFrame !== null) return;
-		layoutFrame = requestAnimationFrame(() => {
-			layoutFrame = null;
-			updateCompactLayout();
+	function scheduleMeasurement() {
+		if (measureFrame !== null) return;
+		measureFrame = requestAnimationFrame(() => {
+			measureFrame = null;
+			measureShellWidths();
+			renderGlassState();
+			syncTensionTarget();
+			startTensionAnimation();
 		});
 	}
 
@@ -688,8 +683,6 @@ function initNavbarScrollLayout() {
 		isCompact = nextCompact;
 		navbar.classList.toggle('scrolled', isCompact);
 		navbarWrapper?.classList.toggle('navbar-scrolled', isCompact);
-		// 状态切换发生在滚动 rAF 内，立即测量可避免先渲染一帧错误锚点。
-		updateCompactLayout();
 		syncTensionTarget();
 		startTensionAnimation();
 	}
@@ -712,28 +705,34 @@ function initNavbarScrollLayout() {
 				progress * 1.68 + velocity * 0.07 + boundaryOvershoot * 2.15,
 			),
 		);
-		const scaleX =
+		const elasticScaleX =
 			0.98 + progress * 0.02 + energy * 0.018 + boundaryOvershoot * 0.18;
 		const scaleY =
 			0.955 + progress * 0.045 - energy * 0.01 - boundaryOvershoot * 0.08;
-		navbar.style.setProperty('--navbar-glass-progress', springPosition.toFixed(4));
-		navbar.style.setProperty('--navbar-glass-velocity', velocity.toFixed(4));
-		navbar.style.setProperty('--navbar-glass-energy', energy.toFixed(4));
-		navbar.style.setProperty('--navbar-glass-scale-x', scaleX.toFixed(4));
-		navbar.style.setProperty('--navbar-glass-scale-y', scaleY.toFixed(4));
-		if (desktopMedia.matches) {
-			const shellWidth = interpolateNavbarShellWidth(
+		const scrollTransform = desktopMedia.matches
+			? computeNavbarScrollTransform(
 				expandedShellWidth,
 				compactShellWidth,
 				springPosition,
-			);
-			navbar.style.setProperty(
-				'--navbar-shell-width',
-				`${shellWidth.toFixed(2)}px`,
-			);
-		} else {
-			navbar.style.removeProperty('--navbar-shell-width');
-		}
+				COMPACT_INSET,
+			)
+			: { shellScaleX: 1, shellInset: 0, sideOffset: 0 };
+		navbar.style.setProperty('--navbar-glass-progress', springPosition.toFixed(4));
+		navbar.style.setProperty('--navbar-glass-velocity', velocity.toFixed(4));
+		navbar.style.setProperty('--navbar-glass-energy', energy.toFixed(4));
+		navbar.style.setProperty(
+			'--navbar-glass-scale-x',
+			(scrollTransform.shellScaleX * elasticScaleX).toFixed(4),
+		);
+		navbar.style.setProperty('--navbar-glass-scale-y', scaleY.toFixed(4));
+		navbar.style.setProperty(
+			'--navbar-shell-inset',
+			`${scrollTransform.shellInset.toFixed(2)}px`,
+		);
+		navbar.style.setProperty(
+			'--navbar-side-offset',
+			`${scrollTransform.sideOffset.toFixed(2)}px`,
+		);
 		navbarFilter.setIntensity(filterIntensity);
 		navbarFilter.setSpecularOpacity(
 			0.62 + progress * 0.48 + energy * 0.24 + boundaryOvershoot * 0.9,
@@ -791,12 +790,22 @@ function initNavbarScrollLayout() {
 
 	function syncTensionTarget() {
 		const rect = segments.getBoundingClientRect();
-		tensionShellSize = { width: rect.width, height: rect.height };
+		const shellInset = Math.max(0, (rect.width - compactShellWidth) / 2);
+		const visualRect = {
+			left: rect.left + shellInset,
+			top: rect.top,
+			width: compactShellWidth,
+			height: rect.height,
+		};
+		tensionShellSize = {
+			width: visualRect.width,
+			height: visualRect.height,
+		};
 		const target = computeNavbarTensionTarget({
 			pointerX: latestPointer.x,
 			pointerY: latestPointer.y,
-			rect,
-			radius: rect.height / 2,
+			rect: visualRect,
+			radius: visualRect.height / 2,
 			activationDistance: TENSION_RANGE,
 			maxExtension: BUBBLE_MAX_DEPTH,
 			enabled:
@@ -936,7 +945,6 @@ function initNavbarScrollLayout() {
 	window.addEventListener('resize', () => {
 		measureShellWidths();
 		renderGlassState();
-		scheduleCompactLayout();
 		navbarFilter.rebuild();
 		fluidFilter.rebuild();
 		leftCapFilter.rebuild();
@@ -949,7 +957,7 @@ function initNavbarScrollLayout() {
 		syncCompactState();
 	}, { signal });
 
-	const resizeObserver = new ResizeObserver(scheduleCompactLayout);
+	const resizeObserver = new ResizeObserver(scheduleMeasurement);
 	resizeObserver.observe(segments);
 	resizeObserver.observe(center);
 
@@ -961,7 +969,7 @@ function initNavbarScrollLayout() {
 		leftCapFilter.destroy();
 		rightCapFilter.destroy();
 		if (scrollFrame !== null) cancelAnimationFrame(scrollFrame);
-		if (layoutFrame !== null) cancelAnimationFrame(layoutFrame);
+		if (measureFrame !== null) cancelAnimationFrame(measureFrame);
 		if (glassFrame !== null) cancelAnimationFrame(glassFrame);
 		if (tensionFrame !== null) cancelAnimationFrame(tensionFrame);
 		if (runtimeWindow.__navbarScrollLayoutCleanup === cleanup) {
@@ -974,7 +982,6 @@ function initNavbarScrollLayout() {
 	syncGlassTarget(true);
 	syncCompactState();
 	navbarWrapper?.classList.toggle('navbar-scrolled', isCompact);
-	updateCompactLayout();
 	syncTensionTarget();
 	renderTensionState();
 }

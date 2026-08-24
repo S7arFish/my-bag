@@ -2,15 +2,16 @@ import { describe, expect, it } from "vitest";
 import {
 	computeNavbarCompactAnchors,
 	computeNavbarCompactShellWidth,
+	computeNavbarScrollTransform,
 	interpolateNavbarShellWidth,
 } from "./navbar-compact-layout";
 
 describe("computeNavbarCompactAnchors", () => {
 	it("keeps compact controls inset from both ends of a wide shell", () => {
 		expect(computeNavbarCompactAnchors(1600, 36, 40)).toEqual({
-		left: 76,
-		right: 1524,
-	});
+			left: 76,
+			right: 1524,
+		});
 	});
 
 	it("clamps the inset so controls do not cross on narrow shells", () => {
@@ -21,9 +22,7 @@ describe("computeNavbarCompactAnchors", () => {
 	});
 
 	it("targets 82 percent of the viewport on a wide desktop", () => {
-		expect(computeNavbarCompactShellWidth(1840, 1920, 980)).toBeCloseTo(
-			1574.4,
-		);
+		expect(computeNavbarCompactShellWidth(1840, 1920, 980)).toBeCloseTo(1574.4);
 	});
 
 	it("keeps enough room for the center menu on a narrow desktop", () => {
@@ -37,11 +36,25 @@ describe("computeNavbarCompactAnchors", () => {
 	it("bounds the elastic width overshoot around the two shell states", () => {
 		expect(interpolateNavbarShellWidth(1840, 1574.4, 0)).toBe(1840);
 		expect(interpolateNavbarShellWidth(1840, 1574.4, 1)).toBe(1574.4);
-		expect(interpolateNavbarShellWidth(1840, 1574.4, 2)).toBeCloseTo(
-			1547.84,
-		);
-		expect(interpolateNavbarShellWidth(1840, 1574.4, -1)).toBeCloseTo(
-			1861.248,
-		);
+		expect(interpolateNavbarShellWidth(1840, 1574.4, 2)).toBeCloseTo(1547.84);
+		expect(interpolateNavbarShellWidth(1840, 1574.4, -1)).toBeCloseTo(1861.248);
+	});
+
+	it("turns shell width changes into compositor transforms and side offsets", () => {
+		expect(computeNavbarScrollTransform(1200, 984, 0, 40)).toEqual({
+			shellScaleX: 1,
+			shellInset: 0,
+			sideOffset: 0,
+		});
+		expect(computeNavbarScrollTransform(1200, 984, 0.5, 40)).toEqual({
+			shellScaleX: 0.91,
+			shellInset: 54,
+			sideOffset: 74,
+		});
+		expect(computeNavbarScrollTransform(1200, 984, 1, 40)).toEqual({
+			shellScaleX: 0.82,
+			shellInset: 108,
+			sideOffset: 148,
+		});
 	});
 });

@@ -44,7 +44,7 @@
 	display: flex;
 	align-items: center;
 	justify-content: center;
-	width: var(--navbar-shell-width, 100%);
+	width: 100%;
 	max-width: var(--page-width, 1200px);
 	min-height: 76px;
 	margin-inline: auto;
@@ -69,7 +69,7 @@
 	transform: scaleX(var(--navbar-glass-scale-x, 0.985))
 		scaleY(var(--navbar-glass-scale-y, 0.97));
 	transform-origin: center;
-	will-change: opacity, transform, backdrop-filter;
+	will-change: opacity, transform;
 }
 
 /* 两端是比中部更厚的液滴透镜，向胶囊中部渐隐。 */
@@ -83,17 +83,19 @@
 	z-index: 1;
 	opacity: clamp(0, var(--navbar-glass-progress, 0), 1);
 	background: rgba(235, 247, 255, 0.018);
-	will-change: opacity, backdrop-filter;
+	will-change: opacity, transform;
 }
 
 .navbar-cap-optics--left {
 	left: 0;
+	transform: translate3d(var(--navbar-shell-inset, 0px), 0, 0);
 	-webkit-mask-image: linear-gradient(90deg, #000 0%, #000 34%, transparent 100%);
 	mask-image: linear-gradient(90deg, #000 0%, #000 34%, transparent 100%);
 }
 
 .navbar-cap-optics--right {
 	right: 0;
+	transform: translate3d(calc(0px - var(--navbar-shell-inset, 0px)), 0, 0);
 	-webkit-mask-image: linear-gradient(270deg, #000 0%, #000 34%, transparent 100%);
 	mask-image: linear-gradient(270deg, #000 0%, #000 34%, transparent 100%);
 }
@@ -189,7 +191,10 @@
 
 .navbar-fluid-surface {
 	position: absolute;
-	inset: -26px;
+	top: -26px;
+	bottom: -26px;
+	left: calc(var(--navbar-compact-shell-inset, 0px) - 26px);
+	width: calc(var(--navbar-compact-shell-width, 100%) + 52px);
 	pointer-events: none;
 	z-index: 1;
 	opacity: min(
@@ -229,7 +234,6 @@
 	);
 	-webkit-backdrop-filter: blur(6px) saturate(1.35);
 	backdrop-filter: blur(6px) saturate(1.35);
-	will-change: backdrop-filter;
 }
 
 .navbar-fluid-surface::before,
@@ -243,8 +247,10 @@
 /* 与真实变形路径共用几何，色散描边会跟着凸起与回弹。 */
 .navbar-fluid-rim {
 	position: absolute;
-	inset: -26px;
-	width: calc(100% + 52px);
+	top: -26px;
+	bottom: -26px;
+	left: calc(var(--navbar-compact-shell-inset, 0px) - 26px);
+	width: calc(var(--navbar-compact-shell-width, 100%) + 52px);
 	height: calc(100% + 52px);
 	overflow: visible;
 	pointer-events: none;
@@ -357,9 +363,7 @@
 		width 0.4s cubic-bezier(0.4, 0, 0.2, 1),
 		height 0.4s cubic-bezier(0.4, 0, 0.2, 1),
 		padding 0.4s cubic-bezier(0.4, 0, 0.2, 1),
-		border-radius 0.4s cubic-bezier(0.4, 0, 0.2, 1),
-		left 0.4s cubic-bezier(0.4, 0, 0.2, 1),
-		transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+		border-radius 0.4s cubic-bezier(0.4, 0, 0.2, 1);
 }
 .navbar-seg > * {
 	position: relative;
@@ -371,7 +375,7 @@
 	position: absolute;
 	left: 0;
 	top: 50%;
-	transform: translateY(-50%);
+	transform: translate3d(var(--navbar-side-offset, 0px), -50%, 0);
 	justify-content: flex-start;
 }
 
@@ -393,7 +397,7 @@
 	left: 100%;
 	right: auto;
 	top: 50%;
-	transform: translate(-100%, -50%);
+	transform: translate3d(calc(-100% - var(--navbar-side-offset, 0px)), -50%, 0);
 	justify-content: flex-end;
 	gap: 0.25rem;
 }
@@ -558,18 +562,6 @@
 	padding: 0;
 	border-radius: 9999px;
 	overflow: hidden;
-}
-
-@media (min-width: 1024px) {
-	#navbar.scrolled .navbar-seg--left {
-		left: var(--navbar-compact-left, 0px);
-		transform: translate(-100%, -50%);
-	}
-	#navbar.scrolled .navbar-seg--right {
-		left: var(--navbar-compact-right, 100%);
-		right: auto;
-		transform: translateY(-50%);
-	}
 }
 
 #navbar.scrolled .nav-search-btn__shortcut {
