@@ -4,6 +4,7 @@ import {
 	NAVBAR_CAP_OPTICS,
 	NAVBAR_FLUID_OPTICS,
 	NAVBAR_TENSION_ACTIVATION_DISTANCE,
+	NAVBAR_UNIFIED_OPTICS,
 	computeChromaticDisplacementScales,
 } from "./navbar-optics";
 
@@ -24,6 +25,18 @@ describe("navbar optical configuration", () => {
 		);
 		expect(NAVBAR_CAP_OPTICS.refractiveIndex).toBeGreaterThan(
 			NAVBAR_FLUID_OPTICS.refractiveIndex,
+		);
+	});
+
+	it("gives the unified capsule the former end-cap optical strength", () => {
+		expect(NAVBAR_UNIFIED_OPTICS.glassThickness).toBeGreaterThan(
+			NAVBAR_FLUID_OPTICS.glassThickness,
+		);
+		expect(NAVBAR_UNIFIED_OPTICS.refractiveIndex).toBeGreaterThan(
+			NAVBAR_FLUID_OPTICS.refractiveIndex,
+		);
+		expect(NAVBAR_UNIFIED_OPTICS.chromaticAberration).toBeGreaterThanOrEqual(
+			NAVBAR_CAP_OPTICS.chromaticAberration,
 		);
 	});
 });
