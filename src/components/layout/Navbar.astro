@@ -41,6 +41,8 @@ if (isLocalSrcLogo) {
 <div id="navbar" class="z-50">
 	<div class="navbar-segments">
 		<div class="navbar-refractive-surface" data-navbar-refractive aria-hidden="true"></div>
+		<div class="navbar-cap-optics navbar-cap-optics--left" data-navbar-cap-left aria-hidden="true"></div>
+		<div class="navbar-cap-optics navbar-cap-optics--right" data-navbar-cap-right aria-hidden="true"></div>
 		<svg class="navbar-fluid-clip-defs" aria-hidden="true" focusable="false">
 			<defs>
 				<clipPath id="navbar-soft-bubble-clip" clipPathUnits="userSpaceOnUse">
@@ -134,9 +136,10 @@ import {
 	stepNavbarSoftBubbleMotion,
 } from "@/utils/navbar-soft-bubble-motion";
 import {
+	NAVBAR_BASE_OPTICS,
+	NAVBAR_CAP_OPTICS,
 	NAVBAR_FLUID_OPTICS,
 	NAVBAR_TENSION_ACTIVATION_DISTANCE,
-	NAVBAR_UNIFIED_OPTICS,
 } from "@/utils/navbar-optics";
 import { attachRefractiveFilter } from "@/utils/refractive/filter-controller";
 import { springIsSettled, stepSpring } from "@/utils/refractive/spring";
@@ -534,6 +537,8 @@ function initNavbarScrollLayout() {
 	const glassLayer = navbar.querySelector<HTMLElement>('[data-navbar-refractive]');
 	const fluidLayer = navbar.querySelector<HTMLElement>('[data-navbar-fluid]');
 	const fluidOpticsLayer = navbar.querySelector<HTMLElement>('[data-navbar-fluid-optics]');
+	const leftCapLayer = navbar.querySelector<HTMLElement>('[data-navbar-cap-left]');
+	const rightCapLayer = navbar.querySelector<HTMLElement>('[data-navbar-cap-right]');
 	const fluidPath = navbar.querySelector<SVGPathElement>('[data-navbar-soft-bubble-path]');
 	const fluidRimPaths = Array.from(
 		navbar.querySelectorAll<SVGPathElement>('[data-navbar-fluid-rim-path]'),
@@ -544,6 +549,8 @@ function initNavbarScrollLayout() {
 		!glassLayer ||
 		!fluidLayer ||
 		!fluidOpticsLayer ||
+		!leftCapLayer ||
+		!rightCapLayer ||
 		!fluidPath ||
 		fluidRimPaths.length === 0
 	) return;
@@ -591,11 +598,11 @@ function initNavbarScrollLayout() {
 		radius: () => glassLayer.getBoundingClientRect().height / 2,
 		bezelWidth: 24,
 		blur: 0.54,
-		glassThickness: NAVBAR_UNIFIED_OPTICS.glassThickness,
-		refractiveIndex: NAVBAR_UNIFIED_OPTICS.refractiveIndex,
-		specularOpacity: NAVBAR_UNIFIED_OPTICS.specularOpacity,
+		glassThickness: NAVBAR_BASE_OPTICS.glassThickness,
+		refractiveIndex: NAVBAR_BASE_OPTICS.refractiveIndex,
+		specularOpacity: NAVBAR_BASE_OPTICS.specularOpacity,
 		specularAngle: (-Math.PI * 55) / 180,
-		chromaticAberration: NAVBAR_UNIFIED_OPTICS.chromaticAberration,
+		chromaticAberration: NAVBAR_BASE_OPTICS.chromaticAberration,
 		pixelRatio: Math.min(window.devicePixelRatio, 3),
 	});
 	const fluidFilter = attachRefractiveFilter(fluidOpticsLayer, {
@@ -609,6 +616,21 @@ function initNavbarScrollLayout() {
 		chromaticAberration: NAVBAR_FLUID_OPTICS.chromaticAberration,
 		pixelRatio: Math.min(window.devicePixelRatio, 3),
 	});
+	const createCapFilter = (layer: HTMLElement, angle: number) =>
+		attachRefractiveFilter(layer, {
+			radius: () => layer.getBoundingClientRect().height / 2,
+			bezelWidth: 29,
+			blur: 0.42,
+			glassThickness: NAVBAR_CAP_OPTICS.glassThickness,
+			refractiveIndex: NAVBAR_CAP_OPTICS.refractiveIndex,
+			specularOpacity: NAVBAR_CAP_OPTICS.specularOpacity,
+			specularAngle: angle,
+			chromaticAberration: NAVBAR_CAP_OPTICS.chromaticAberration,
+			pixelRatio: Math.min(window.devicePixelRatio, 3),
+		});
+	const leftCapFilter = createCapFilter(leftCapLayer, (-Math.PI * 42) / 180);
+	const rightCapFilter = createCapFilter(rightCapLayer, (-Math.PI * 138) / 180);
+
 	function measureShellWidths() {
 		const navbarWidth = navbar.getBoundingClientRect().width;
 		const computedMaxWidth = Number.parseFloat(
@@ -715,6 +737,15 @@ function initNavbarScrollLayout() {
 		navbarFilter.setSpecularOpacity(
 			0.62 + progress * 0.48 + energy * 0.24 + boundaryOvershoot * 0.9,
 		);
+		const capIntensity = Math.min(2.62, filterIntensity * 1.18);
+		leftCapFilter.setIntensity(capIntensity);
+		rightCapFilter.setIntensity(capIntensity);
+		const capSpecular = Math.min(
+			1.42,
+			0.72 + progress * 0.56 + energy * 0.28 + boundaryOvershoot,
+		);
+		leftCapFilter.setSpecularOpacity(capSpecular);
+		rightCapFilter.setSpecularOpacity(capSpecular);
 	}
 
 	function animateGlass(time: number) {
@@ -916,6 +947,8 @@ function initNavbarScrollLayout() {
 		renderGlassState();
 		navbarFilter.rebuild();
 		fluidFilter.rebuild();
+		leftCapFilter.rebuild();
+		rightCapFilter.rebuild();
 		syncTensionTarget();
 		startTensionAnimation();
 	}, { passive: true, signal });
@@ -933,6 +966,8 @@ function initNavbarScrollLayout() {
 		resizeObserver.disconnect();
 		navbarFilter.destroy();
 		fluidFilter.destroy();
+		leftCapFilter.destroy();
+		rightCapFilter.destroy();
 		if (scrollFrame !== null) cancelAnimationFrame(scrollFrame);
 		if (measureFrame !== null) cancelAnimationFrame(measureFrame);
 		if (glassFrame !== null) cancelAnimationFrame(glassFrame);

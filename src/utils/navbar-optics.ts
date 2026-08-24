@@ -34,10 +34,6 @@ export const NAVBAR_CAP_OPTICS: NavbarOpticalPreset = {
 	chromaticAberration: 0.2,
 };
 
-export const NAVBAR_UNIFIED_OPTICS: NavbarOpticalPreset = {
-	...NAVBAR_CAP_OPTICS,
-};
-
 export function computeChromaticDisplacementScales(
 	maximum: number,
 	intensity: number,
