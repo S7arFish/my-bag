@@ -1,0 +1,32 @@
+<script is:inline data-swup-ignore-script>
+	;(() => {
+		if (window.__miniBlogVisitTracker) return
+		window.__miniBlogVisitTracker = true
+		let lastTrackedUrl = ''
+
+		const trackPageview = async () => {
+			const currentUrl = `${location.pathname}${location.search}`
+			if (currentUrl === lastTrackedUrl) return
+			lastTrackedUrl = currentUrl
+			try {
+				const response = await fetch('/api/visit', {
+					method: 'POST',
+					credentials: 'same-origin',
+					headers: { Accept: 'application/json' },
+				})
+				if (!response.ok) return
+				const detail = await response.json()
+				window.dispatchEvent(new CustomEvent('site:visit-stats', { detail }))
+			} catch {
+				// 本地 Astro 开发服务器没有统计接口时静默跳过。
+			}
+		}
+
+		if (document.readyState === 'loading') {
+			document.addEventListener('DOMContentLoaded', trackPageview, { once: true })
+		} else {
+			void trackPageview()
+		}
+		document.addEventListener('astro:page-load', trackPageview)
+	})()
+</script>

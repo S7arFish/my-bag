@@ -2,204 +2,113 @@ name: 🔍 友链每日巡检
 
 on:
   schedule:
-    - cron: '0 8 * * *'
+    - cron: "0 8 * * *"
   workflow_dispatch:
+
+concurrency:
+  group: blog-automation-writes
+  cancel-in-progress: false
 
 jobs:
   check-friends:
     runs-on: ubuntu-latest
     permissions:
+      contents: write
       issues: write
     steps:
-      - name: 检出代码
+      - name: Checkout default branch
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
-      - name: 安装 Node.js
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: "22"
+          cache: pnpm
 
-      - name: 安装 Playwright
-        run: |
-          mkdir -p /tmp/playwright-setup
-          cd /tmp/playwright-setup
-          npm init -y
-          npm install playwright
-          npx playwright install --with-deps chromium
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
 
-      - name: 创建巡检脚本
-        run: |
-          cat > cron-check.cjs << 'EOF'
-          const { chromium } = require('playwright');
-          const fs = require('fs');
-
-          async function checkFriend(page, url, retries = 3) {
-            let lastError = null;
-
-            for (let i = 0; i < retries; i++) {
-              try {
-                const response = await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 12000 });
-                const statusCode = response ? response.status() : null;
-                if (response && response.ok()) {
-                  return { ok: true, status: statusCode, url: page.url() };
-                }
-                lastError = `HTTP ${statusCode}`;
-              } catch (e) {
-                lastError = e.message;
-                if (i < retries - 1) {
-                  await new Promise(r => setTimeout(r, 2000));
-                }
-              }
-            }
-            return { ok: false, error: lastError, url: url };
-          }
-
-          async function main() {
-            const friendsConfigPath = 'src/config/friendsConfig.ts';
-            const friendsConfigContent = fs.readFileSync(friendsConfigPath, 'utf-8');
-
-            // 正则匹配 friendsConfig 数组内容
-            const friendsConfigRegex = /export const friendsConfig: FriendLink\[\] = (\[(\s|\S)*?\]);/;
-            const match = friendsConfigContent.match(friendsConfigRegex);
-            if (!match) {
-              console.error('❌ 读取友链配置失败：未找到 friendsConfig 数组');
-              process.exit(1);
-            }
-
-            // 解析为JSON数组（TS对象 → JSON）
-            // 策略：先把所有字符串字面量占位保护起来，再删注释，最后还原字符串
-            const stringPlaceholders = [];
-            let protectedRaw = match[1]
-              // 保护多行/单行字符串字面量（包括引号本身）
-              .replace(/"(?:[^"\\]|\\.)*"/g, (m) => {
-                stringPlaceholders.push(m);
-                return `__STRING_${stringPlaceholders.length - 1}__`;
-              });
-
-            // 删除行内注释和块注释（此时字符串已安全）
-            protectedRaw = protectedRaw
-              .replace(/\/\/.*$/gm, '')
-              .replace(/\/\*[\s\S]*?\*\//g, '');
-
-            // 还原字符串
-            let raw = protectedRaw.replace(/__STRING_(\d+)__/g, (_, i) => stringPlaceholders[+i]);
-
-            // TS 对象属性名加引号，转成合法 JSON
-            raw = raw
-              .replace(/\btitle\s*:/g, '"title":')
-              .replace(/\bimgurl\s*:/g, '"imgurl":')
-              .replace(/\bdesc\s*:/g, '"desc":')
-              .replace(/\bsiteurl\s*:/g, '"siteurl":')
-              .replace(/\btags\s*:/g, '"tags":')
-              .replace(/\bweight\s*:/g, '"weight":')
-              .replace(/\benabled\s*:/g, '"enabled":')
-              // 删除对象 / 数组尾部可能存在的 trailing commas
-              .replace(/,\s*(?=[\]}])/g, '');
-
-            const friends = JSON.parse(raw);
-            const results = [];
-
-            const browser = await chromium.launch({ headless: true });
-            const context = await browser.newContext({
-              userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-            });
-
-            try {
-              for (const f of friends) {
-                // 仅检查启用的友链
-                if (!f.enabled) continue;
-
-                const url = f.siteurl.replace(/\/$/, '');
-                console.log(`检查: ${f.title} - ${url}`);
-                const page = await context.newPage();
-                try {
-                  const result = await checkFriend(page, url);
-                  const status = result.ok ? '✅' : '❌';
-                  console.log(` 结果: ${status} ${result.ok ? '' : result.error}`);
-                  results.push({
-                    name: f.title,
-                    url: url,
-                    ok: result.ok,
-                    error: result.error || null
-                  });
-                } finally {
-                  await page.close();
-                }
-                await new Promise(r => setTimeout(r, 2000));
-              }
-            } finally {
-              await browser.close();
-            }
-
-            fs.writeFileSync('/tmp/cron_results.json', JSON.stringify(results, null, 2));
-            const total = results.length;
-            const ok = results.filter(r => r.ok).length;
-            const fail = results.filter(r => !r.ok).length;
-            console.log(`总计: ${total} | 正常: ${ok} | 不可达: ${fail}`);
-          }
-
-          main();
-          EOF
-
-      - name: 执行巡检
-        id: check
+      - name: Check friend links
         env:
-          NODE_PATH: /tmp/playwright-setup/node_modules
-        run: node cron-check.cjs
+          FRIEND_ALERTS_PATH: ${{ runner.temp }}/friend-alert-events.json
+        run: node scripts/friend-links/check.mjs
 
-      - name: 处理异常并通知
+      - name: Commit changed status
+        run: |
+          if git diff --quiet -- public/friend-status.json; then
+            echo "Friend status is unchanged."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add -- public/friend-status.json
+          git commit -m "friend-links: update health status"
+          git push origin HEAD:${{ github.event.repository.default_branch }}
+
+      - name: Open or resolve threshold alerts
         uses: actions/github-script@v7
+        env:
+          FRIEND_ALERTS_PATH: ${{ runner.temp }}/friend-alert-events.json
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
-            const fs = require('fs');
-            const results = JSON.parse(fs.readFileSync('/tmp/cron_results.json', 'utf-8'));
-            const total = results.length;
-            const ok = results.filter(r => r.ok).length;
-            const fail = results.filter(r => !r.ok).length;
-            const failed = results.filter(r => !r.ok);
+            const fs = require('node:fs');
+            const events = JSON.parse(fs.readFileSync(process.env.FRIEND_ALERTS_PATH, 'utf8'));
+            if (events.length === 0) return;
 
-            let body = `## 🔍 友链每日巡检报告
-
-            📊 **总览**
-            - 检测总数：${total}
-            - ✅ 正常：${ok}
-            - ❌ 不可达：${fail}
-
-            `;
-            if (fail > 0) {
-              body += `### ❌ 不可达的友链\n\n`;
-              failed.forEach(r => {
-                body += `- **${r.name}** - ${r.url}\n  - 原因: ${r.error}\n`;
-              });
-            } else {
-              body += `🎉 所有友链状态正常！\n`;
-            }
-            body += `\n_检测时间: ${new Date().toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' })}_`;
-
-            // 确保标签存在
-            let label;
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const label = 'friend-health';
             try {
-              label = await github.rest.issues.getLabel({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                name: '自动巡检'
-              });
-            } catch (e) {
+              await github.rest.issues.getLabel({ owner, repo, name: label });
+            } catch (error) {
+              if (error.status !== 404) throw error;
               await github.rest.issues.createLabel({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                name: '自动巡检',
-                color: '0075ca',
-                description: '友链自动巡检报告'
+                owner,
+                repo,
+                name: label,
+                color: 'd73a4a',
+                description: '友链连续巡检失败告警',
               });
             }
 
-            await github.rest.issues.create({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              title: `🔍 友链巡检报告 ${new Date().toLocaleDateString('zh-CN')}`,
-              body: body,
-              labels: ['自动巡检']
+            const openIssues = await github.paginate(github.rest.issues.listForRepo, {
+              owner,
+              repo,
+              state: 'open',
+              labels: label,
+              per_page: 100,
             });
-            console.log('巡检报告已发布');
+            for (const event of events) {
+              const marker = `<!-- friend-health:${event.siteUrl} -->`;
+              const existing = openIssues.find((issue) => issue.body?.includes(marker));
+              if (event.type === 'alert' && !existing) {
+                await github.rest.issues.create({
+                  owner,
+                  repo,
+                  title: `[友链巡检] ${String(event.title).replace(/[\r\n]/g, ' ')}`,
+                  labels: [label],
+                  body: `${marker}\n友链 ${event.siteUrl} 已连续三次不可达或缺少反链，请人工确认。`,
+                });
+              }
+              if (event.type === 'recovered' && existing) {
+                await github.rest.issues.createComment({
+                  owner,
+                  repo,
+                  issue_number: existing.number,
+                  body: '✅ 最新巡检已恢复正常，自动关闭告警。',
+                });
+                await github.rest.issues.update({
+                  owner,
+                  repo,
+                  issue_number: existing.number,
+                  state: 'closed',
+                  state_reason: 'completed',
+                });
+              }
+            }

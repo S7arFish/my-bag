@@ -36,8 +36,7 @@ export const lip: SurfaceFunction = (x) => {
 	const value = clamp01(x);
 	const convexValue = Math.max(0, 1 - (1 - value * 2) ** 4) ** 0.25;
 	const concaveValue = concave(value) + 0.1;
-	const smootherStep =
-		6 * value ** 5 - 15 * value ** 4 + 10 * value ** 3;
+	const smootherStep = 6 * value ** 5 - 15 * value ** 4 + 10 * value ** 3;
 	return convexValue * (1 - smootherStep) + concaveValue * smootherStep;
 };
 

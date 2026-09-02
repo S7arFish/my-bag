@@ -7,7 +7,12 @@ body:
     attributes:
       value: |
         ## 友链申请
-        请填写以下信息，我们将在收到申请后尽快审核。
+        请先在你的友链页加入本站，再填写以下信息。机器人只认可真实的 `<a href="https://lolicon.meme">` 链接，正文中单独写域名不会通过。
+
+        - 名称：MiNi飞飞
+        - 链接：https://lolicon.meme
+        - 头像：https://lolicon.meme/favicon/android-chrome-512x512.png
+        - 描述：MiNi飞飞的博客
   - type: input
     id: name
     attributes:
@@ -36,6 +41,12 @@ body:
       placeholder: 一句话描述
     validations:
       required: true
+  - type: input
+    id: tag
+    attributes:
+      label: 网站标签
+      description: 可选，例如 Blog、Docs
+      placeholder: Blog
   - type: input
     id: friend_page
     attributes:

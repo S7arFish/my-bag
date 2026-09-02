@@ -24,7 +24,7 @@ interface MusicState {
 
 interface FireflyMusicManager {
 	getState: () => MusicState;
-	init: () => void;
+	init: (autoPlay?: boolean) => Promise<void>;
 	togglePlay: () => void;
 	playNext: () => void;
 	playPrev: () => void;

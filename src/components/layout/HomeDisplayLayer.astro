@@ -29,9 +29,9 @@ const transparentPixel =
 			<img
 				class="home-display-layer__emitter"
 				data-display-emitter
-				src={displayConfig.emitterImage}
+				data-src={displayConfig.emitterImage}
+				src={transparentPixel}
 				alt=""
-				loading="eager"
 				decoding="async"
 			/>
 		)}
@@ -95,7 +95,8 @@ const transparentPixel =
 					<div
 						class="home-portfolio-shutter__panel-copy"
 						data-shutter-panel-copy
-						style={`--panel-image: url(${panel.image})`}
+						data-panel-image={panel.image}
+						style="--panel-image: none;"
 					>
 						<div class="home-portfolio-shutter__panel-title-bar">
 							<span class="home-portfolio-shutter__panel-label">{panel.english}</span>
@@ -141,14 +142,25 @@ const transparentPixel =
 			</div>
 
 			<img
-			class="home-portfolio-shutter__interlude-fg"
-			data-shutter-interlude-fg
-			data-src={interlude.foreground}
-			src={transparentPixel}
-			alt=""
-			loading="eager"
-			decoding="async"
-		/>
+				class="home-portfolio-shutter__interlude-fg home-portfolio-shutter__interlude-fg--left"
+				data-shutter-interlude-fg
+				data-shutter-interlude-side="left"
+				data-src={interlude.foregrounds.left}
+				src={transparentPixel}
+				alt=""
+				loading="eager"
+				decoding="async"
+			/>
+			<img
+				class="home-portfolio-shutter__interlude-fg home-portfolio-shutter__interlude-fg--right"
+				data-shutter-interlude-fg
+				data-shutter-interlude-side="right"
+				data-src={interlude.foregrounds.right}
+				src={transparentPixel}
+				alt=""
+				loading="eager"
+				decoding="async"
+			/>
 		</div>
 
 		<div class="home-portfolio-shutter__final-copy" data-shutter-final-copy>
@@ -227,6 +239,7 @@ const transparentPixel =
 
 	let activeCleanup: Cleanup | null = null;
 	let mediaCleanup: Cleanup | null = null;
+	let displayObserver: IntersectionObserver | null = null;
 	let initToken = 0;
 
 	function matchesDesktop() {
@@ -244,7 +257,7 @@ const transparentPixel =
 	function getLazyImages(root: HTMLElement) {
 		return Array.from(
 			root.querySelectorAll<HTMLElement>(
-				"img[data-shutter-image], img[data-shutter-final-midground], img[data-shutter-final-foreground], img[data-shutter-interlude-fg], img[data-shutter-interlude-strip-left], img[data-shutter-interlude-strip-right], video[data-shutter-final-video]",
+				"img[data-display-emitter], img[data-shutter-image], img[data-shutter-final-midground], img[data-shutter-final-foreground], img[data-shutter-interlude-fg], img[data-shutter-interlude-strip-left], img[data-shutter-interlude-strip-right], video[data-shutter-final-video]",
 			),
 		);
 	}
@@ -320,6 +333,11 @@ function waitVideoReady(video: HTMLVideoElement) {
 }
 
 async function hydrateLazyImages(root: HTMLElement) {
+	for (const copy of root.querySelectorAll<HTMLElement>("[data-panel-image]")) {
+		const image = copy.dataset.panelImage;
+		if (image) copy.style.setProperty("--panel-image", `url(${JSON.stringify(image)})`);
+	}
+
 	const elements = getLazyImages(root);
 	const images: HTMLImageElement[] = [];
 	const videos: HTMLVideoElement[] = [];
@@ -372,6 +390,8 @@ async function hydrateLazyImages(root: HTMLElement) {
 
 	function teardownDisplay() {
 	initToken += 1;
+	displayObserver?.disconnect();
+	displayObserver = null;
 	if (activeCleanup) {
 		activeCleanup();
 		activeCleanup = null;
@@ -471,7 +491,9 @@ async function hydrateLazyImages(root: HTMLElement) {
 		);
 		const interlude = root.querySelector<HTMLElement>("[data-shutter-interlude]");
 		const interludeBg = root.querySelector<HTMLElement>("[data-shutter-interlude-bg]");
-		const interludeFg = root.querySelector<HTMLElement>("[data-shutter-interlude-fg]");
+		const interludeFgs = Array.from(
+			root.querySelectorAll<HTMLElement>("[data-shutter-interlude-fg]"),
+		);
 		const interludeCopy = root.querySelector<HTMLElement>("[data-shutter-interlude-copy]");
 		const interludeCopyLeft = root.querySelector<HTMLElement>(
 			".home-portfolio-shutter__interlude-copy-text--left",
@@ -497,7 +519,7 @@ async function hydrateLazyImages(root: HTMLElement) {
 			!mask ||
 			!interlude ||
 			!interludeBg ||
-			!interludeFg ||
+			interludeFgs.length !== 2 ||
 			!interludeCopy ||
 			!interludeCopyLeft ||
 			!interludeCopyRight ||
@@ -550,7 +572,7 @@ async function hydrateLazyImages(root: HTMLElement) {
 
 		gsap.set(interlude, { autoAlpha: 1 });
 		gsap.set(interludeBg, { autoAlpha: 0 });
-		gsap.set(interludeFg, { autoAlpha: 0, yPercent: 8, scale: 1.04 });
+		gsap.set(interludeFgs, { autoAlpha: 0, yPercent: 8, scale: 1.04 });
 		gsap.set([interludeCopyLeft, interludeCopyRight], { autoAlpha: 0 });
 		gsap.set(stripLeft, { xPercent: -100 });
 		gsap.set(stripRight, { xPercent: 100 });
@@ -699,7 +721,7 @@ async function hydrateLazyImages(root: HTMLElement) {
 
 		// 前景渐入
 		timeline.to(
-			interludeFg,
+			interludeFgs,
 			{
 				autoAlpha: 1,
 				yPercent: 0,
@@ -828,7 +850,7 @@ async function hydrateLazyImages(root: HTMLElement) {
 					finalCopy,
 					interlude,
 					interludeBg,
-					interludeFg,
+					...interludeFgs,
 					interludeCopy,
 					interludeCopyLeft,
 					interludeCopyRight,
@@ -880,10 +902,24 @@ async function hydrateLazyImages(root: HTMLElement) {
 		root.dataset.displayBootstrapped = "true";
 		setupMediaWatchers();
 
-		// 首页关键资源：boot 时立即初始化，initHomeDisplayLayer 内部会尽早并行
-		// 加载所有图片/视频并等待 decode/canplaythrough，确保用户滚动到时资源已就绪。
+		// 展示层包含多张大图和视频。等用户接近该区块再预载，避免它们与首屏、
+		// 导航和音乐首播争抢带宽。
 		if (matchesDesktop() && !prefersReducedMotion()) {
-			void initHomeDisplayLayer();
+			if (!("IntersectionObserver" in window)) {
+				void initHomeDisplayLayer();
+				return;
+			}
+			displayObserver?.disconnect();
+			displayObserver = new IntersectionObserver(
+				(entries) => {
+					if (!entries.some((entry) => entry.isIntersecting)) return;
+					displayObserver?.disconnect();
+					displayObserver = null;
+					void initHomeDisplayLayer();
+				},
+				{ rootMargin: "100% 0px" },
+			);
+			displayObserver.observe(root);
 		}
 	}
 

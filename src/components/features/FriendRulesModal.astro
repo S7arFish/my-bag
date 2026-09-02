@@ -82,26 +82,15 @@ const notes = friendsPageConfig.notes;
             <div class="fr-step-num">2</div>
             <div class="fr-step-line"></div>
             <div class="fr-step-content">
-              <p class="fr-step-title">在下方评论区提交申请</p>
-              <p class="fr-step-desc">将下方模板内容复制修改后，前往本页评论区发送</p>
-              <div class="fr-template">
-                <button
-                  class="fr-copy-btn fr-template-copy"
-                  onclick={`navigator.clipboard.writeText('站点名称：您的站点名称\\n站点描述：您的站点描述\\n站点链接：您的站点链接\\n头像链接：您的站点头像');this.classList.add('copied');setTimeout(()=>this.classList.remove('copied'),1500)`}
-                  aria-label="复制模板"
-                >
-                  <Icon name="material-symbols:content-copy-outline-rounded" class="fr-copy-icon" />
-                  <Icon name="material-symbols:check-rounded" class="fr-check-icon" />
-                </button>
-                <pre class="fr-template-text">{`站点名称：您的站点名称\n站点描述：您的站点描述\n站点链接：您的站点链接\n头像链接：您的站点头像`}</pre>
-              </div>
+              <p class="fr-step-title">填写 GitHub 自助申请表</p>
+              <p class="fr-step-desc">点击下方按钮填写站点地址、头像、简介和您放置本站链接的友链页</p>
             </div>
           </div>
           <div class="fr-step">
             <div class="fr-step-num">3</div>
             <div class="fr-step-content">
-              <p class="fr-step-title">等待审核</p>
-              <p class="fr-step-desc">确认信息无误后会尽快添加您的友链</p>
+              <p class="fr-step-title">自动验证并上线</p>
+              <p class="fr-step-desc">机器人确认网站可访问且存在真实反链后，会自动更新友链；失败时可修正后回复 Issue 重试</p>
             </div>
           </div>
         </div>

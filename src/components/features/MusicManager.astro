@@ -6,32 +6,38 @@ import { url } from "@/utils/url-utils";
 
 const config = musicPlayerConfig;
 
+const resolveMusicAssetPath = (path: string) =>
+	/^https?:\/\//.test(path) ? path : url(path);
+
 const localPlaylist =
 	config.mode === "local" && config.local?.playlist
 		? config.local.playlist.map((song) => {
-				const isFullUrl = (path: string) => /^https?:\/\//.test(path);
 				return {
 					name: song.name,
 					artist: song.artist,
-					url: isFullUrl(song.url) ? song.url : url(song.url),
-					pic: song.cover
-						? isFullUrl(song.cover)
-							? song.cover
-							: url(song.cover)
-						: undefined,
-					lrc: song.lrc
-						? isFullUrl(song.lrc)
-							? song.lrc
-							: url(song.lrc)
-						: undefined,
+					url: resolveMusicAssetPath(song.url),
+					pic: song.cover ? resolveMusicAssetPath(song.cover) : undefined,
+					lrc: song.lrc ? resolveMusicAssetPath(song.lrc) : undefined,
 				};
 			})
 		: [];
+
+const localOverrides = Object.fromEntries(
+	Object.entries(config.local?.overrides ?? {}).map(([key, track]) => [
+		key,
+		{
+			url: resolveMusicAssetPath(track.url),
+			pic: track.cover ? resolveMusicAssetPath(track.cover) : undefined,
+			lrc: track.lrc ? resolveMusicAssetPath(track.lrc) : undefined,
+		},
+	]),
+);
 
 const managerConfigStr = JSON.stringify({
 	mode: config.mode,
 	meting: config.meting,
 	localPlaylist: localPlaylist,
+	localOverrides: localOverrides,
 	volume: config.volume ?? 0.7,
 	playMode: config.playMode ?? "list",
 	showLyrics: config.showLyrics ?? true,
@@ -98,8 +104,14 @@ const managerConfigStr = JSON.stringify({
     var audio = document.getElementById('firefly-music-audio') || document.createElement('audio');
     audio.id = 'firefly-music-audio';
     audio.crossOrigin = 'anonymous';
+    audio.preload = 'metadata';
     audio.style.display = 'none';
     if (!audio.parentNode) document.body.appendChild(audio);
+
+    // Share one initialization task. If the user presses play while metadata
+    // is loading, remember that intent instead of silently dropping the click.
+    var initPromise = null;
+    var playAfterInit = false;
 
     // ── State ────────────────────────────────────────────────
     var state = {
@@ -150,15 +162,20 @@ const managerConfigStr = JSON.stringify({
                 if (!res.ok) throw new Error('HTTP ' + res.status);
                 var data = await res.json();
 
-                if (Array.isArray(data) && data.length > 0) {
-                    state.playlist = data.map(function (item) {
-                        return {
-                            name: item.title || item.name || 'Unknown',
-                            artist: item.author || item.artist || 'Unknown',
-                            url: item.url,
-                            pic: item.pic || item.cover || '',
-                            lrc: item.lrc
-                        };
+				if (Array.isArray(data) && data.length > 0) {
+					state.playlist = data.map(function (item) {
+						var itemName = item.title || item.name || 'Unknown';
+						var idMatch = String(item.url || '').match(/[?&]id=(\d+)/);
+						var trackId = idMatch ? idMatch[1] : '';
+						var override = config.localOverrides &&
+							(config.localOverrides[trackId] || config.localOverrides[itemName]);
+						return {
+							name: itemName,
+							artist: item.author || item.artist || 'Unknown',
+							url: override && override.url ? override.url : item.url,
+							pic: override && override.pic ? override.pic : (item.pic || item.cover || ''),
+							lrc: override && override.lrc ? override.lrc : item.lrc
+						};
                     });
                     return;
                 }
@@ -208,6 +225,19 @@ const managerConfigStr = JSON.stringify({
     }
 
     // ── Track loading ────────────────────────────────────────
+    function startPlayback() {
+        return audio.play().then(function () {
+            state.isPlaying = true;
+            emit('fm:play-state', { isPlaying: true });
+            return true;
+        }).catch(function (e) {
+            state.isPlaying = false;
+            emit('fm:play-state', { isPlaying: false });
+            console.warn('Audio playback failed:', e);
+            return false;
+        });
+    }
+
     function loadTrack(index, autoPlay) {
         if (index < 0 || index >= state.playlist.length) return;
         state.currentIndex = index;
@@ -220,12 +250,7 @@ const managerConfigStr = JSON.stringify({
         emit('fm:track', { index: index, track: track, autoPlay: !!autoPlay });
 
         if (autoPlay) {
-            audio.play().then(function () {
-                state.isPlaying = true;
-                emit('fm:play-state', { isPlaying: true });
-            }).catch(function (e) {
-                console.warn('Autoplay blocked:', e);
-            });
+            startPlayback();
         } else {
             state.isPlaying = false;
             emit('fm:play-state', { isPlaying: false });
@@ -235,10 +260,7 @@ const managerConfigStr = JSON.stringify({
     // ── Playback controls ────────────────────────────────────
     function togglePlay() {
         if (audio.paused) {
-            audio.play().then(function () {
-                state.isPlaying = true;
-                emit('fm:play-state', { isPlaying: true });
-            });
+            startPlayback();
         } else {
             audio.pause();
             state.isPlaying = false;
@@ -353,10 +375,21 @@ const managerConfigStr = JSON.stringify({
     });
 
     // ── Init (idempotent) ────────────────────────────────────
-    async function init() {
-        if (state.initialized || state.initializing) return;
+    function init(autoPlay) {
+        if (autoPlay) playAfterInit = true;
+
+        if (state.initialized) {
+            if (playAfterInit && state.playlist.length > 0 && audio.paused) {
+                playAfterInit = false;
+                return startPlayback().then(function () {});
+            }
+            return Promise.resolve();
+        }
+
+        if (initPromise) return initPromise;
         state.initializing = true;
 
+        initPromise = (async function () {
         try {
             if (config.mode === 'meting' && config.meting) {
                 await fetchMetingData();
@@ -382,7 +415,9 @@ const managerConfigStr = JSON.stringify({
                     isMuted: state.isMuted
                 });
 
-                loadTrack(startIndex, false);
+                var shouldPlay = playAfterInit;
+                playAfterInit = false;
+                loadTrack(startIndex, shouldPlay);
             } else {
                 state.initialized = true;
                 emit('fm:init', {
@@ -394,6 +429,7 @@ const managerConfigStr = JSON.stringify({
                 emit('fm:error', { message: config.i18n.noSongs });
             }
         } catch (e) {
+            playAfterInit = false;
             console.error('Music Manager init error:', e);
             state.initialized = true;
             emit('fm:init', {
@@ -405,7 +441,11 @@ const managerConfigStr = JSON.stringify({
             emit('fm:error', { message: config.i18n.error });
         } finally {
             state.initializing = false;
+            initPromise = null;
         }
+        })();
+
+        return initPromise;
     }
 
     // ── Public API ───────────────────────────────────────────

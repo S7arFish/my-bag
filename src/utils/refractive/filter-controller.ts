@@ -1,16 +1,16 @@
+import { computeChromaticDisplacementScales } from "../navbar-optics";
 import {
 	buildDisplacementRaster,
 	buildSpecularRaster,
-	splitRasterNineSlice,
 	type RasterMap,
 	type RasterNineSlice,
+	splitRasterNineSlice,
 } from "./raster-maps";
 import {
 	convexSquircle,
 	precomputeRadialDisplacement,
 	type SurfaceFunction,
 } from "./surface-equations";
-import { computeChromaticDisplacementScales } from "../navbar-optics";
 
 export interface RefractiveFilterOptions {
 	radius: number | (() => number);
@@ -189,9 +189,7 @@ export function attachRefractiveFilter(
 		specularAlphaNode?.setAttribute("slope", String(specularOpacity));
 	}
 
-	function appendDisplacement(
-		result: string,
-	): SVGFEDisplacementMapElement {
+	function appendDisplacement(result: string): SVGFEDisplacementMapElement {
 		const node = createSvgElement("feDisplacementMap");
 		node.setAttribute("in", "blurred-source");
 		node.setAttribute("in2", "displacement-map");
@@ -202,11 +200,7 @@ export function attachRefractiveFilter(
 		return node;
 	}
 
-	function appendChannel(
-		input: string,
-		result: string,
-		matrix: string,
-	): void {
+	function appendChannel(input: string, result: string, matrix: string): void {
 		const color = createSvgElement("feColorMatrix");
 		color.setAttribute("in", input);
 		color.setAttribute("type", "matrix");

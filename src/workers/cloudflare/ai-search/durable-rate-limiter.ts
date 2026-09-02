@@ -11,8 +11,8 @@ interface RateLimitRow {
 	reset_at: number;
 }
 
-export class RateLimiter extends DurableObject<Env> {
-	constructor(ctx: DurableObjectState, env: Env) {
+export class RateLimiter extends DurableObject<Record<string, never>> {
+	constructor(ctx: DurableObjectState, env: Record<string, never>) {
 		super(ctx, env);
 		this.ctx.storage.sql.exec(`
 			CREATE TABLE IF NOT EXISTS rate_limit (

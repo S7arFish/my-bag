@@ -34,7 +34,11 @@ export interface RasterNineSlice {
 const clampByte = (value: number) =>
 	Math.round(Math.min(255, Math.max(0, value)));
 
-function createRaster(width: number, height: number, neutral: boolean): RasterMap {
+function createRaster(
+	width: number,
+	height: number,
+	neutral: boolean,
+): RasterMap {
 	const data = new Uint8ClampedArray(width * height * 4);
 	for (let index = 0; index < data.length; index += 4) {
 		data[index] = neutral ? 128 : 255;
@@ -96,7 +100,10 @@ export function buildSpecularRaster({
 	const radiusPixels = Math.max(1, Math.round(radius * ratio));
 	const size = radiusPixels * 2 + 1;
 	const map = createRaster(size, size, false);
-	const bezelPixels = Math.min(radiusPixels, Math.max(2, Math.round(20 * ratio)));
+	const bezelPixels = Math.min(
+		radiusPixels,
+		Math.max(2, Math.round(20 * ratio)),
+	);
 	const lightX = Math.cos(angle);
 	const lightY = Math.sin(angle);
 

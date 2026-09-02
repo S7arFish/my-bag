@@ -8,14 +8,14 @@ import { sponsorConfig } from "./sponsorConfig";
 
 describe("external service cleanup", () => {
 	it("disconnects the original Umami service", () => {
-		const umami = siteConfig.analytics.umamiAnalytics;
+		const umami = siteConfig.analytics!.umamiAnalytics!;
 
 		expect(umami.websiteId).toBe("");
 		expect(umami.shareId).toBe("");
 		expect(umami.scriptUrl).toBe("");
-		expect(umami.pageviews.enabled).toBe(false);
+		expect(umami.pageviews!.enabled).toBe(false);
 		expect(umami.trackOutboundLinks).toBe(false);
-		expect(umami.relpays.enabled).toBe(false);
+		expect(umami.relpays!.enabled).toBe(false);
 	});
 
 	it("turns off comments and removes the original comment identities", () => {
@@ -36,9 +36,11 @@ describe("external service cleanup", () => {
 		expect(sponsorConfig.sponsors).toEqual([]);
 	});
 
-	it("keeps AI search and friend-link automation disabled", () => {
+	it("keeps AI search disabled and enables repository-owned friend-link automation", () => {
 		expect(aiSearchConfig.enabled).toBe(false);
-		expect(friendsPageConfig.applyLink).toBe("");
+		expect(friendsPageConfig.applyLink).toBe(
+			"https://github.com/S7arFish/my-bag/issues/new?template=friend-link.yml",
+		);
 
 		const workflow = readFileSync(
 			new URL(
@@ -55,8 +57,10 @@ describe("external service cleanup", () => {
 			"utf8",
 		);
 
-		expect(workflow).toMatch(/on:\s*\n\s+workflow_dispatch:/);
+		expect(workflow).toMatch(/issues:\s*\n\s+types:/);
+		expect(workflow).toContain("issue_comment:");
 		expect(automation).not.toContain("MmzMing");
 		expect(automation).not.toContain("tblog.mmzhiku.xyz");
+		expect(automation).toContain("https://lolicon.meme");
 	});
 });

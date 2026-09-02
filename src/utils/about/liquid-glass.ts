@@ -44,9 +44,10 @@ export function computeLiquidGlassOrbStyle(
 		highlightY: 36 + clamp(speedY * 6, -6, 6),
 		scaleX: 1 + motion * 0.06,
 		scaleY: 1 - motion * 0.03,
-		rotation: motion === 0
-			? 0
-			: clamp((Math.atan2(speedY, speedX) * 180) / Math.PI, -12, 12),
+		rotation:
+			motion === 0
+				? 0
+				: clamp((Math.atan2(speedY, speedX) * 180) / Math.PI, -12, 12),
 		intensity: 1 + motion * 0.18,
 	};
 }

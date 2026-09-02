@@ -22,6 +22,8 @@ const latestPost = posts.reduce((latest, post) => {
 const lastPostDate = latestPost
 	? latestPost.data.published.toISOString()
 	: null;
+const lastUpdateDate = siteConfig.siteLastUpdateDate || lastPostDate;
+const siteTimezone = siteConfig.timezone || "Asia/Shanghai";
 
 const runningDaysText = i18n(I18nKey.footerRunningDays);
 const lastUpdateText = i18n(I18nKey.footerLastUpdate);
@@ -88,12 +90,23 @@ const isExternalLink = (href: string) => !/^(mailto:|tel:)/i.test(href);
 		<div class="flex items-center justify-center gap-3 text-neutral-500 dark:text-neutral-400 text-sm">
 			<span class="flex items-center gap-1">
 				<Icon name="material-symbols:calendar-clock-outline" is:inline class="text-base" />
-				<span id="footer-running-days" data-template={runningDaysText}>--</span>
+				<span
+					id="footer-running-days"
+					data-template={runningDaysText}
+					data-start-date={siteStartDate}
+					data-timezone={siteTimezone}
+				>--</span>
 			</span>
 			<span class="text-neutral-300 dark:text-neutral-600">|</span>
 			<span class="flex items-center gap-1">
 				<Icon name="mingcute:heartbeat-line" is:inline class="text-base" />
-				<span id="footer-last-update" data-template={lastUpdateText} data-today={todayText}>--</span>
+				<span
+					id="footer-last-update"
+					data-template={lastUpdateText}
+					data-today={todayText}
+					data-last-update-date={lastUpdateDate}
+					data-timezone={siteTimezone}
+				>--</span>
 			</span>
 		</div>
 
@@ -152,27 +165,34 @@ const isExternalLink = (href: string) => !/^(mailto:|tel:)/i.test(href);
 	</div>
 </div>
 
-<script is:inline define:vars={{ siteStartDate, lastPostDate }}>
+<script>
+	import {
+		calculateDaysSinceUpdate,
+		calculateRunningDays,
+	} from "@/utils/footer-stats";
+
 	function updateFooterStats() {
 		const today = new Date();
-
-		// 更新运行天数
-		const startDate = new Date(siteStartDate);
-		const diffTime = Math.abs(today.getTime() - startDate.getTime());
-		const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-
 		const runningDaysEl = document.getElementById('footer-running-days');
 		if (runningDaysEl) {
+			const startDate = runningDaysEl.dataset.startDate;
+			const timezone = runningDaysEl.dataset.timezone || "Asia/Shanghai";
+			const diffDays = startDate
+				? calculateRunningDays(startDate, today, timezone)
+				: 1;
 			const template = runningDaysEl.dataset.template || '已运行 {days} 天';
 			runningDaysEl.textContent = template.replace('{days}', diffDays.toString());
 		}
 
-		// 更新最后活动时间
 		const lastUpdateEl = document.getElementById('footer-last-update');
-		if (lastUpdateEl && lastPostDate) {
-			const lastPost = new Date(lastPostDate);
-			const timeSinceLastPost = Math.abs(today.getTime() - lastPost.getTime());
-			const daysSinceLastUpdate = Math.floor(timeSinceLastPost / (1000 * 60 * 60 * 24));
+		const lastUpdateDate = lastUpdateEl?.dataset.lastUpdateDate;
+		if (lastUpdateEl && lastUpdateDate) {
+			const timezone = lastUpdateEl.dataset.timezone || "Asia/Shanghai";
+			const daysSinceLastUpdate = calculateDaysSinceUpdate(
+				lastUpdateDate,
+				today,
+				timezone,
+			);
 			const template = lastUpdateEl.dataset.template || '最后更新于 {days} 天前';
 			const todayText = lastUpdateEl.dataset.today || '今天';
 
@@ -184,10 +204,8 @@ const isExternalLink = (href: string) => !/^(mailto:|tel:)/i.test(href);
 		}
 	}
 
-	// 页面加载时更新
 	updateFooterStats();
 
-	// 页面切换时重新更新（防止 swup 重复执行脚本导致监听器累积）
 	if (!window.__footer_listener) {
 		window.__footer_listener = true;
 		document.addEventListener("astro:page-load", () => {

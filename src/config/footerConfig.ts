@@ -27,8 +27,11 @@ export const footerConfig: FooterConfig = {
 
 	// 备案信息（icp/police 留空则不显示对应条目）
 	beian: {
-		icp: "粤ICP备2026073665号-1",
-		police: "粤公网安备44060602003342号",
+		// 暂未备案，需要时恢复下面两项即可：
+		// icp: "粤ICP备2026073665号-1",
+		// police: "粤公网安备44060602003342号",
+		icp: "",
+		police: "",
 		policeIcon: "/assets/images/备案图标.png",
 		icpUrl: "https://beian.miit.gov.cn/#/Integrated/index",
 		policeUrl: "https://beian.mps.gov.cn/#/query/webSearch?code=44060602003342",

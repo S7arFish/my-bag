@@ -2,9 +2,9 @@ name: CI
 
 on:
   push:
-    branches: [ master ]
+    branches: [main]
   pull_request:
-    branches: [ master ]
+    branches: [main]
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -36,6 +36,9 @@ jobs:
 
       - name: Run Astro Check
         run: pnpm astro check
+
+      - name: Run tests
+        run: pnpm test
 
   quality:
     runs-on: ubuntu-latest

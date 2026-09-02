@@ -16,13 +16,36 @@ const isHome = pathname === "/" || pathname === "";
 		class="page-loader__animation"
 	>
 		<img
-			src="/assets/images/loading/feibi-loading.webp"
-			alt=""
-			class="page-loader__image"
-			width="960"
-			height="540"
-			decoding="async"
+				src="/assets/images/loading/feibi-loading-poster.webp"
+				alt=""
+				class="page-loader__image"
+				width="640"
+				height="360"
+				decoding="async"
+				fetchpriority="high"
 		/>
 	</div>
 	<span class="page-loader__sr-only">Loading</span>
 </div>
+<script is:inline>
+	;(() => {
+		const loader = document.getElementById("page-loader")
+		if (!loader || loader.hidden) return
+
+		// Fail open even when a client module is stale, blocked or fails to load.
+		window.setTimeout(() => {
+			if (loader.hidden || loader.classList.contains("page-loader--hidden")) return
+			loader.dataset.failOpenHidden = "true"
+			loader.classList.remove("page-loader--visible")
+			loader.classList.add("page-loader--hidden")
+			document.documentElement.classList.remove("is-page-loading")
+			document.body?.removeAttribute("aria-busy")
+			window.setTimeout(() => {
+				loader.hidden = true
+				document.dispatchEvent(new CustomEvent("firefly:page-loader-hidden", {
+					detail: { timestamp: Date.now(), reason: "fail-open" },
+				}))
+			}, 220)
+		}, 1600)
+	})()
+</script>

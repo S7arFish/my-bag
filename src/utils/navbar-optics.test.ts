@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
+	computeChromaticDisplacementScales,
 	NAVBAR_BASE_OPTICS,
 	NAVBAR_CAP_OPTICS,
 	NAVBAR_FLUID_OPTICS,
 	NAVBAR_TENSION_ACTIVATION_DISTANCE,
-	computeChromaticDisplacementScales,
 } from "./navbar-optics";
 
 describe("navbar optical configuration", () => {

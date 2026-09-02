@@ -2,38 +2,20 @@
 	"$schema": "./node_modules/wrangler/config-schema.json",
 	"name": "my-blog",
 	"main": "src/worker.ts",
-	"compatibility_date": "2026-05-07",
-	"compatibility_flags": ["nodejs_compat"],
+	"compatibility_date": "2026-07-15",
 	"assets": {
 		"directory": "./dist",
 		"binding": "ASSETS",
 		"html_handling": "force-trailing-slash",
 		"not_found_handling": "404-page"
 	},
-	"vars": {
-		"NODE_VERSION": "22"
-	},
-	"vectorize": [
+	"d1_databases": [
 		{
-			"binding": "VECTORIZE",
-			"index_name": "blog-ai-search"
-		}
-	],
-	"ai": {
-		"binding": "AI"
-	},
-	"durable_objects": {
-		"bindings": [
-			{
-				"name": "AI_RATE_LIMITER",
-				"class_name": "RateLimiter"
-			}
-		]
-	},
-	"migrations": [
-		{
-			"tag": "v1-ai-rate-limiter",
-			"new_sqlite_classes": ["RateLimiter"]
+			"binding": "BLOG_DB",
+			"database_name": "my-blog-stats",
+			// 由 `wrangler d1 create --location apac --binding BLOG_DB --update-config` 创建。
+			"database_id": "20c49913-7169-4921-b288-e0d50187bf1e",
+			"migrations_dir": "migrations"
 		}
 	],
 	"observability": {

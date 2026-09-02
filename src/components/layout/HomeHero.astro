@@ -84,6 +84,15 @@ const nameLetters = Array.from(homeConfig.displayName || "");
 
 const mobileBackground =
 	homeConfig.hero.backgroundImageMobile || homeConfig.hero.backgroundImage;
+const desktopBackground = homeConfig.hero.backgroundImage;
+const optimizedDesktopBackground =
+	desktopBackground === "/assets/images/home/home.webp"
+		? {
+				src: "/assets/images/home/home-1280.webp",
+				srcset:
+					"/assets/images/home/home-1280.webp 1280w, /assets/images/home/home-1920.webp 1920w",
+			}
+		: { src: desktopBackground, srcset: undefined };
 
 const rainConfig = {
 	enabled: homeConfig.hero.rain?.enabled ?? true,
@@ -101,7 +110,15 @@ const rainConfig = {
 	<!-- 背景层：移动端 / 桌面端通过 <picture> 服务端切换 -->
 	<picture class="home-hero__video-picture">
 		<source media="(max-width: 768px)" srcset={mobileBackground} />
-		<img class="home-hero__video" src={homeConfig.hero.backgroundImage} alt="" />
+		<img
+			class="home-hero__video"
+			src={optimizedDesktopBackground.src}
+			srcset={optimizedDesktopBackground.srcset}
+			sizes="100vw"
+			fetchpriority="high"
+			decoding="async"
+			alt=""
+		/>
 	</picture>
 
 	<!-- 全屏内容容器 -->
@@ -143,7 +160,7 @@ const rainConfig = {
 								alt="avatar"
 								class="home-hero__avatar"
 								id="hero-avatar"
-								loading="eager"
+								loading="lazy"
 							/>
 						</div>
 						<div class="home-hero__status-badge" id="work-status">

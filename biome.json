@@ -9,6 +9,7 @@
     "ignoreUnknown": false,
     "includes": [
       "**",
+      "!**/src/个人博客4.0/**/*",
       "!**/src/**/*.css",
       "!**/src/public/**/*",
       "!**/dist/**/*",

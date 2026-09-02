@@ -1,5 +1,5 @@
 const DEFAULT_HIDE_DELAY = 0;
-const DEFAULT_MAX_WAIT = 8000;
+const DEFAULT_MAX_WAIT = 800;
 
 export const LOADER_READY_EVENT = "firefly:page-loader-ready";
 export const LOADER_HIDDEN_EVENT = "firefly:page-loader-hidden";
@@ -277,6 +277,14 @@ export function initPageLoader({
 	if (!isHomePath(windowRef.location.pathname)) {
 		hideLoaderImmediately(domContext);
 	} else {
+		// The inline fail-open may have hidden the loader before this module
+		// arrived (or after a transient module error). Never bring it back.
+		if (loader.dataset.failOpenHidden === "true") {
+			hideLoaderImmediately(domContext);
+			bindSwup({ controller, document: documentRef, window: windowRef });
+			return controller;
+		}
+
 		controller.show("initial");
 
 		const hideInitialLoader = () => {
@@ -285,8 +293,9 @@ export function initPageLoader({
 			});
 		};
 
-		if (documentRef.readyState === "complete") hideInitialLoader();
-		else windowRef.addEventListener("load", hideInitialLoader, { once: true });
+		// Do not wait for window.load: below-the-fold images and route preloads
+		// are not prerequisites for showing an already-rendered page.
+		hideInitialLoader();
 	}
 
 	documentRef.addEventListener("astro:page-load", () => {

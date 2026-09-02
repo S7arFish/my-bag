@@ -7,8 +7,12 @@ import {
 	TrainFront,
 	X,
 } from "lucide-svelte";
-import { onDestroy, tick } from "svelte";
+import { onDestroy, onMount, tick } from "svelte";
 import type { FriendLink } from "@/types/config";
+import {
+	describeFriendHealth,
+	parseFriendHealthDocument,
+} from "@/utils/friend-health";
 import FriendPlatformScene from "./FriendPlatformScene.svelte";
 
 type ViewMode = "map" | "directory";
@@ -55,6 +59,8 @@ let departureDirection = $state<DepartureDirection>("right");
 let tourNextStation = $state<FriendLink | null>(null);
 let pendingArrival: ArrivalRequest | null = null;
 let activeArrivalOnOpen: (() => void) | undefined;
+let healthDocument = $state<unknown>(null);
+let healthLookup = $derived(parseFriendHealthDocument(healthDocument));
 
 let tags = $derived(
 	Array.from(new Set(items.flatMap((item) => item.tags ?? []))).sort(),
@@ -140,6 +146,10 @@ function markerClass(friend: FriendLink): string {
 	if (tag === "favoriteblog") return "marker-diamond";
 	if (tag === "星图") return "marker-orbit";
 	return "marker-circle";
+}
+
+function healthPresentation(friend: FriendLink) {
+	return describeFriendHealth(healthLookup.get(friend.siteurl));
 }
 
 function prefersReducedMotion(): boolean {
@@ -418,6 +428,22 @@ onDestroy(() => {
 	clearArrivalTimers();
 	clearTourTimer();
 });
+
+onMount(() => {
+	const controller = new AbortController();
+	void fetch("/friend-status.json", {
+		cache: "no-store",
+		signal: controller.signal,
+	})
+		.then((response) => (response.ok ? response.json() : null))
+		.then((value) => {
+			healthDocument = value;
+		})
+		.catch(() => {
+			healthDocument = null;
+		});
+	return () => controller.abort();
+});
 </script>
 
 <section class="friend-terminal" aria-label="友链中央站">
@@ -479,7 +505,7 @@ onDestroy(() => {
 
 	<div class="terminal-status" aria-live="polite">
 		<span><strong>{filteredItems.length}</strong> / {items.length} 个站点</span>
-		<span class="status-hint">选择线路站点，等待列车进站</span>
+		<span class="status-hint">状态由每日巡检更新，未知状态不影响访问</span>
 	</div>
 
 	{#if viewMode === "map"}
@@ -562,6 +588,7 @@ onDestroy(() => {
 								<h2>{selected.title}</h2>
 								<div class="arrival-tags">
 									{#each selected.tags ?? ["Blog"] as tag (tag)}<span>{tag}</span>{/each}
+									<span class={`health-badge health-${healthPresentation(selected).kind}`}>{healthPresentation(selected).label}</span>
 								</div>
 								<div class="arrival-description">{selected.desc}</div>
 							</div>
@@ -595,6 +622,7 @@ onDestroy(() => {
 						<span class="ticket-avatar-fallback" hidden>{initialOf(friend.title)}</span>
 					</span>
 					<span class="ticket-copy"><strong>{friend.title}</strong><small>{friend.desc}</small></span>
+					<span class={`ticket-health health-${healthPresentation(friend).kind}`}>{healthPresentation(friend).label}</span>
 					<span class="ticket-link-icon" aria-hidden="true">
 						<ExternalLink size={18} strokeWidth={1.8} aria-hidden="true" />
 					</span>
@@ -662,12 +690,12 @@ onDestroy(() => {
 									class:selected={selected?.siteurl === friend.siteurl}
 									disabled={!matchesDialogFriend(friend)}
 									data-station
-									aria-label={`${friend.title}，${friend.desc}`}
+									aria-label={`${friend.title}，${friend.desc}，${healthPresentation(friend).label}`}
 									onclick={() => openFriend(friend)}
 									onkeydown={handleStationKeydown}
 								>
 									<span class="station-name" title={friend.title}>{shortLabel(friend.title)}</span>
-									<span class={`station-marker ${markerClass(friend)}`} aria-hidden="true"></span>
+									<span class={`station-marker ${markerClass(friend)} health-${healthPresentation(friend).kind}`} aria-hidden="true"></span>
 								</button>
 							{/each}
 						</div>
@@ -1427,6 +1455,7 @@ onDestroy(() => {
 	.arrival-description { max-width: 48rem; margin-top: 0.8rem; color: var(--terminal-muted); font-size: 0.88rem; line-height: 1.65; }
 	.arrival-tags { display: flex; flex-wrap: wrap; gap: 0.35rem; margin-top: 0.65rem; }
 	.arrival-tags span { padding: 0.22rem 0.5rem; border: 1px solid var(--terminal-ink); border-radius: 999px; font: 650 0.64rem/1.2 ui-monospace, SFMono-Regular, Menlo, monospace; }
+	.arrival-tags .health-badge { border-style: dashed; }
 
 	.arrival-visit {
 		display: inline-flex;
@@ -1563,7 +1592,7 @@ onDestroy(() => {
 
 	.directory-ticket {
 		display: grid;
-		grid-template-columns: auto minmax(0, 1fr) auto;
+		grid-template-columns: auto minmax(0, 1fr) auto auto;
 		align-items: center;
 		gap: 0.75rem;
 		min-width: 0;
@@ -1599,6 +1628,20 @@ onDestroy(() => {
 	.ticket-copy small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 	.ticket-copy strong { font-size: 0.9rem; }
 	.ticket-copy small { color: var(--terminal-muted); font-size: 0.72rem; }
+	.ticket-health {
+		padding: 0.2rem 0.38rem;
+		border: 1px dashed currentColor;
+		border-radius: 999px;
+		font: 700 0.58rem/1 ui-monospace, SFMono-Regular, Menlo, monospace;
+		white-space: nowrap;
+	}
+	.health-online { color: #087a52; }
+	.health-slow { color: #a15c00; }
+	.health-offline,
+	.health-missing-backlink { color: #b42318; }
+	.health-unknown { color: var(--terminal-muted); }
+	.station-marker.health-offline,
+	.station-marker.health-missing-backlink { border-style: dashed; opacity: 0.58; }
 	.ticket-link-icon {
 		display: inline-flex;
 		align-items: center;

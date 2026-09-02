@@ -35,6 +35,7 @@ declare global {
 		__searchLoadersReady?: boolean;
 		__aiSearchMounted?: boolean;
 		__searchModalMounted?: boolean;
+		__footer_listener?: boolean;
 		_showLive2DWidget?: () => void;
 		_closeLive2DWidget?: () => void;
 		// biome-ignore lint/suspicious/noExplicitAny: External library
@@ -47,7 +48,7 @@ declare global {
 			}>;
 		};
 		__fireflyMusic?: {
-			init: () => Promise<void>;
+			init: (autoPlay?: boolean) => Promise<void>;
 			getState: () => {
 				playlist: Array<{
 					name: string;

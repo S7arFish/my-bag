@@ -16,14 +16,15 @@ export const friendsPageConfig: FriendsPageConfig = {
 
 	// 友链申请链接，填写后会在友链页面显示申请按钮
 	// 使用模板参数直接跳转到友链申请模板
-	applyLink: "",
+	applyLink:
+		"https://github.com/S7arFish/my-bag/issues/new?template=friend-link.yml",
 
 	// 本站信息，用于友链申请指南弹窗中的站点信息展示
 	siteInfo: {
-		name: "MmzMing的知识库",
-		desc: "哈基米，南北绿豆",
-		url: "https://tblog.mmzhiku.xyz",
-		avatar: "https://i.stardots.io/784774835/StarDots-2026052116374135506.jpg",
+		name: "MiNi飞飞",
+		desc: "MiNi飞飞的博客",
+		url: "https://lolicon.meme",
+		avatar: "https://lolicon.meme/favicon/android-chrome-512x512.png",
 		email: "3425963262@qq.com",
 	},
 

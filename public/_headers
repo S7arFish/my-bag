@@ -1,5 +1,19 @@
 # 静态资源缓存策略（Cloudflare Workers Assets / EdgeOne Pages 均支持 _headers）
 # 仅覆盖内容哈希路径：/_astro/* 文件名含 hash，内容变则 URL 变，可安全 immutable。
 # /assets/*、/fonts/* 为非哈希路径，不设 immutable，以免资源更新后客户端长期持旧缓存。
+/*
+  Content-Security-Policy-Report-Only: default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'self'; form-action 'self' https:; img-src 'self' data: blob: https:; font-src 'self' data: https:; style-src 'self' 'unsafe-inline' https:; script-src 'self' 'unsafe-inline' 'unsafe-eval' https:; connect-src 'self' https: wss:; media-src 'self' blob: https:; frame-src https:; worker-src 'self' blob:
+  Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=(), usb=(), browsing-topics=()
+  Referrer-Policy: strict-origin-when-cross-origin
+  Strict-Transport-Security: max-age=63072000; includeSubDomains; preload
+  X-Content-Type-Options: nosniff
+  X-Frame-Options: SAMEORIGIN
+
 /_astro/*
   Cache-Control: public, max-age=31536000, immutable
+
+/friend-status.json
+  Cache-Control: public, max-age=300, must-revalidate
+
+/assets/music/*
+  Cache-Control: public, max-age=604800

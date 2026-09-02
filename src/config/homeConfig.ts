@@ -24,7 +24,7 @@ export const homeConfig: HomeConfig = {
 	nameBadge: "B站：4444级小鱼",
 
 	// 职业/身份标签
-	occupation: "[全(无)栈工程师/摄影爱好者]",
+	occupation: "[全(无)栈萌新/不会拍照的摄影爱好者]",
 
 	// 个人签名（支持多条，会循环打字+删除效果）
 	bio: ["为天地立心，为生民立命，为往圣继绝学，为万世开太平"],
@@ -138,11 +138,14 @@ export const homeConfig: HomeConfig = {
 			alt: "2026年 加油！",
 		},
 		interlude: {
-			foreground: "/assets/images/home-truncated/b-1.webp",
+			foregrounds: {
+				left: "/assets/images/home-truncated/rimuru.webp",
+				right: "/assets/images/home-truncated/milim.webp",
+			},
 			stripLeft: "/assets/images/home-truncated/b-2.webp",
 			stripRight: "/assets/images/home-truncated/b-3.webp",
-			copyLeft: "菲比",
-			copyRight: "啾比",
+			copyLeft: "迷你",
+			copyRight: "飞飞",
 		},
 		panels: [
 			{

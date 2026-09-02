@@ -14,6 +14,10 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT_DIR = join(__dirname, "..");
 const SRC_DIR = join(ROOT_DIR, "src");
 const OUTPUT_FILE = join(SRC_DIR, "constants", "icons.ts");
+const IGNORED_SOURCE_DIRECTORIES = new Set([
+	"node_modules",
+	"个人博客4.0",
+]);
 
 // 支持的图标集及其包名
 const ICON_SETS = {
@@ -44,8 +48,8 @@ function getAllFiles(dir, extensions = [".svelte", ".astro", ".ts"]) {
 			const stat = statSync(fullPath);
 
 			if (stat.isDirectory()) {
-				// 跳过 node_modules 和隐藏目录
-				if (!item.startsWith(".") && item !== "node_modules") {
+				// 跳过依赖、隐藏目录和放在 src 下的历史项目备份。
+				if (!item.startsWith(".") && !IGNORED_SOURCE_DIRECTORIES.has(item)) {
 					walk(fullPath);
 				}
 			} else if (extensions.some((ext) => item.endsWith(ext))) {

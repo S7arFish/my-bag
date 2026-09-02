@@ -595,7 +595,7 @@ const widgetId =
         // Lazy 模式下，首次点击播放按钮时触发初始化
         if (!mgr.getState().initialized) {
             setLoading(true);
-            mgr.init();
+            mgr.init(true);
             return;
         }
         mgr.togglePlay();

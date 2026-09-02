@@ -7,12 +7,26 @@ import { cloudflareAiSearchLogger } from "./logger";
 import { VectorizeRetriever } from "./vectorize-retriever";
 import { WorkersAiProvider } from "./workers-ai-provider";
 
-function getOptionalEnvString(env: Env, key: string): string | undefined {
+interface LegacyAiSearchEnv {
+	AI: Ai;
+	AI_RATE_LIMITER: DurableObjectNamespace<
+		import("./durable-rate-limiter").RateLimiter
+	>;
+	VECTORIZE: VectorizeIndex;
+	AI_API_KEY?: string;
+	ALLOWED_ORIGINS?: string;
+	PUBLIC_SITE_URL?: string;
+}
+
+function getOptionalEnvString(
+	env: LegacyAiSearchEnv,
+	key: string,
+): string | undefined {
 	const value = Reflect.get(env, key);
 	return typeof value === "string" && value.trim() ? value.trim() : undefined;
 }
 
-function getAllowedOrigins(env: Env): string[] {
+function getAllowedOrigins(env: LegacyAiSearchEnv): string[] {
 	return String(
 		getOptionalEnvString(env, "ALLOWED_ORIGINS") ??
 			getOptionalEnvString(env, "PUBLIC_SITE_URL") ??
@@ -23,7 +37,9 @@ function getAllowedOrigins(env: Env): string[] {
 		.filter(Boolean);
 }
 
-export function createCloudflareAiSearchRuntime(env: Env): AiSearchRuntime {
+export function createCloudflareAiSearchRuntime(
+	env: LegacyAiSearchEnv,
+): AiSearchRuntime {
 	const apiKey = getOptionalEnvString(env, "AI_API_KEY");
 	const provider = apiKey
 		? new OpenAiCompatibleProvider({
@@ -54,7 +70,7 @@ export function createCloudflareAiSearchRuntime(env: Env): AiSearchRuntime {
 
 export function handleCloudflareAiSearch(
 	request: Request,
-	env: Env,
+	env: LegacyAiSearchEnv,
 ): Promise<Response> {
 	return handleAiSearch(request, createCloudflareAiSearchRuntime(env));
 }

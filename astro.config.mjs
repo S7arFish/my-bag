@@ -48,6 +48,8 @@ import rehypeFigure from "./src/plugins/rehype-figure.mjs";
 import { remarkImageGrid } from "./src/plugins/remark-image-grid.js";
 import { unified } from "@astrojs/markdown-remark";
 
+import react from "@astrojs/react";
+
 if (process.env.NODE_ENV === "development") {
 	setMaxListeners(20);
 }
@@ -74,7 +76,7 @@ function getPostLastmod(postId) {
 // https://astro.build/config
 export default defineConfig({
 	site: siteConfig.site_url,
-	
+
 	base: "/",
 	trailingSlash: "always",
 
@@ -95,7 +97,10 @@ export default defineConfig({
 			],
 			smoothScrolling: false,
 			cache: true,
-			preload: { hover: true, visible: true },
+			// Visible-link preloading competes with the initial page and media on
+			// constrained connections. Hover keeps navigation predictive without
+			// downloading every link as soon as the homepage opens.
+			preload: { hover: true, visible: false },
 			loadOnIdle: false,
 			accessibility: true,
 			updateHead: true,
@@ -241,6 +246,7 @@ export default defineConfig({
 			},
 		}),
 		mdx(),
+		react(),
 	],
 	markdown: {
 		processor: unified({
@@ -301,9 +307,25 @@ export default defineConfig({
 	},
 	vite: {
 		plugins: [tailwindcss()],
+		preview: {
+			allowedHosts: ["lolicon.meme", "lumisle.tail714e97.ts.net"],
+		},
+		optimizeDeps: {
+			// `src/个人博客4.0` is an archived standalone project. Keep it
+			// out of Vite's dependency scan so its private dependencies cannot
+			// invalidate the active app's optimized-dependency cache.
+			entries: [
+				"src/**/*.{astro,html,js,jsx,ts,tsx,svelte}",
+				"!src/个人博客4.0/**",
+			],
+		},
 		server: {
 			watch: {
-				ignored: ["**/package/**", "**/Firefly-docs/**"],
+				ignored: [
+					"**/package/**",
+					"**/Firefly-docs/**",
+					"**/src/个人博客4.0/**",
+				],
 			},
 			proxy: {
 				"/api": {
@@ -338,9 +360,6 @@ export default defineConfig({
 							if (id.includes("pixi") || id.includes("live2d")) return "vendor-live2d";
 							if (id.includes("gsap")) return "vendor-gsap";
 						}
-						if (id.includes("AISearch")) return "vendor-ai";
-						if (id.includes("Guestbook")) return "vendor-guestbook";
-						if (id.includes("CalendarGrid")) return "vendor-calendar";
 					},
 				},
 				onwarn(warning, warn) {

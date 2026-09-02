@@ -1,34 +1,39 @@
-name: 🤝 自动更新友链
+name: 🤝 自动验证并更新友链
 
 on:
-  workflow_dispatch:
+  issues:
+    types: [opened, edited, reopened]
+  issue_comment:
+    types: [created]
+concurrency:
+  group: blog-automation-writes
+  cancel-in-progress: false
 
 jobs:
   update-friends:
+    if: contains(github.event.issue.labels.*.name, 'friend-link')
     runs-on: ubuntu-latest
     permissions:
       contents: write
       issues: write
     steps:
-      - name: Checkout repository
+      - name: Checkout default branch
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
           ref: ${{ github.event.repository.default_branch }}
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
 
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: pnpm
+
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
-
-      - name: Install Playwright browsers
-        run: pnpm exec playwright install --with-deps chromium
 
       - name: Process friend request
         uses: actions/github-script@v7

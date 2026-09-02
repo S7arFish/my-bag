@@ -29,12 +29,18 @@ const articlePills = [
 	{ label: "标签", value: tags.length, tone: "solid" as const },
 	{ label: "字数", value: totalWords.toLocaleString(), tone: "light" as const },
 ];
+const umamiConfig = siteConfig.analytics?.umamiAnalytics;
+const statsBaseUrl = umamiConfig?.scriptUrl
+	? new URL(umamiConfig.scriptUrl).origin
+	: "";
+const statsShareId = umamiConfig?.shareId ?? "";
+const usesUmamiStats = Boolean(statsBaseUrl && statsShareId);
 const visitPills = [
 	{ label: "UV", value: "--", tone: "light" as const },
 	{ label: "PV", value: "--", tone: "dark" as const },
 	{
 		label: i18n(I18nKey.siteStatsSource),
-		value: "Umami",
+		value: usesUmamiStats ? "Umami" : "本地",
 		tone: "outline" as const,
 	},
 ];
@@ -47,11 +53,8 @@ const contactItems = homeConfig.links.map((link) => ({
 const primaryContactItems = contactItems.filter((link) =>
 	primaryContactNames.has(link.name.toLowerCase()),
 );
-const umamiConfig = siteConfig.analytics?.umamiAnalytics;
-const statsBaseUrl = umamiConfig?.scriptUrl
-	? new URL(umamiConfig.scriptUrl).origin
-	: "";
-const statsShareId = umamiConfig?.shareId ?? "";
+const transparentPixel =
+	"data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==";
 ---
 
 <section
@@ -139,7 +142,7 @@ const statsShareId = umamiConfig?.shareId ?? "";
 
 			<section class="guide-card guide-card--contact" aria-labelledby="guide-contact-title" data-guide-contact tabindex="0">
 				<div class="guide-card__visual" aria-hidden="true">
-					<img src={homeConfig.dataLayer.contactImage} alt="" loading="lazy" decoding="async" />
+					<img src={transparentPixel} data-home-data-src={homeConfig.dataLayer.contactImage} alt="" decoding="async" />
 				</div>
 				<p class="guide-card__eyebrow">SUBSCRIBE</p>
 				<h3 id="guide-contact-title">订阅与联系</h3>
@@ -160,6 +163,10 @@ const statsShareId = umamiConfig?.shareId ?? "";
 	import { createCache } from "@/utils/cache-utils";
 	import { formatCompactNumber } from "@/utils/home-data-layer.js";
 	import { waitForPageLoaderHidden } from "@/utils/page-loader-controller.js";
+	import {
+		normalizeSiteVisitStats,
+		type SiteVisitStats,
+	} from "@/utils/site-visit-stats";
 
 	type Cleanup = () => void;
 	type ShareData = { websiteId: string; token: string };
@@ -343,9 +350,47 @@ const statsShareId = umamiConfig?.shareId ?? "";
 	function initVisitStats(layer: HTMLElement) {
 		const statsBaseUrl = layer.dataset.statsBaseUrl;
 		const statsShareId = layer.dataset.statsShareId;
-		if (!statsBaseUrl || !statsShareId) return;
 		const detail = layer.querySelector<HTMLElement>(".data-card[data-stat-kind='visits'] .data-card__detail");
 		const valueNodes = layer.querySelectorAll<HTMLElement>("[data-stat-value]");
+		const applyStats = ({ visitors, pageviews }: SiteVisitStats) => {
+			const uvCompact = formatCompactNumber(visitors);
+			const pvCompact = formatCompactNumber(pageviews);
+			if (detail) detail.textContent = `访客 ${uvCompact} / 浏览 ${pvCompact}`;
+			valueNodes.forEach((node) => {
+				const isUv = node.dataset.statValue === "UV";
+				const isPv = node.dataset.statValue === "PV";
+				if (!isUv && !isPv) return;
+				const value = isUv ? visitors : pageviews;
+				node.dataset.compactValue = formatCompactNumber(value);
+				node.dataset.fullValue = Number(value).toLocaleString();
+				node.textContent = node.dataset.compactValue;
+			});
+		};
+
+		if (!statsBaseUrl || !statsShareId) {
+			const onVisitStats = (event: Event) => {
+				const stats = normalizeSiteVisitStats((event as CustomEvent).detail);
+				if (stats) applyStats(stats);
+			};
+			window.addEventListener("site:visit-stats", onVisitStats);
+			cleanups.push(() => window.removeEventListener("site:visit-stats", onVisitStats));
+			fetch("/api/stats", { headers: { Accept: "application/json" } })
+				.then((response) => {
+					if (!response.ok) throw new Error("本地统计服务尚未启动");
+					return response.json();
+				})
+				.then((data) => {
+					const stats = normalizeSiteVisitStats(data);
+					if (!stats) throw new Error("统计数据格式错误");
+					applyStats(stats);
+				})
+				.catch(() => {
+					if (detail?.textContent?.includes("载入中")) {
+						detail.textContent = "统计服务将在部署后启用";
+					}
+				});
+			return;
+		}
 		shareCache.fetch(async () => {
 			const response = await fetch(`${statsBaseUrl}/api/share/${statsShareId}`);
 			if (!response.ok) throw new Error("获取 Umami 分享信息失败");
@@ -356,19 +401,9 @@ const statsShareId = umamiConfig?.shareId ?? "";
 		}).then(({ websiteId, token }) => fetch(`${statsBaseUrl}/api/websites/${websiteId}/stats?startAt=0&endAt=${Date.now()}`, {
 			headers: { "x-umami-share-token": token, "x-umami-share-context": "1", "Content-Type": "application/json" },
 		})).then((response) => response.json()).then((data: { uv?: number; visitors?: number; pv?: number; pageviews?: number }) => {
-			const uvRaw = data.uv || data.visitors || 0;
-			const pvRaw = data.pv || data.pageviews || 0;
-			const uvCompact = formatCompactNumber(uvRaw);
-			const pvCompact = formatCompactNumber(pvRaw);
-			if (detail) detail.textContent = `访客 ${uvCompact} / 浏览 ${pvCompact}`;
-			valueNodes.forEach((node) => {
-				const isUv = node.dataset.statValue === "UV";
-				const isPv = node.dataset.statValue === "PV";
-				if (!isUv && !isPv) return;
-				const value = isUv ? uvRaw : pvRaw;
-				node.dataset.compactValue = formatCompactNumber(value);
-				node.dataset.fullValue = Number(value).toLocaleString();
-				node.textContent = node.dataset.compactValue;
+			applyStats({
+				visitors: data.uv || data.visitors || 0,
+				pageviews: data.pv || data.pageviews || 0,
 			});
 		}).catch(() => {
 			if (detail) detail.textContent = "访客 -- / 浏览 --";
@@ -523,11 +558,36 @@ const statsShareId = umamiConfig?.shareId ?? "";
 		});
 	}
 
+	function initDeferredImages(layer: HTMLElement) {
+		const images = Array.from(
+			layer.querySelectorAll<HTMLImageElement>("img[data-home-data-src]"),
+		);
+		if (images.length === 0) return;
+		const hydrate = () => {
+			images.forEach((image) => {
+				const src = image.dataset.homeDataSrc;
+				if (src && image.getAttribute("src") !== src) image.setAttribute("src", src);
+			});
+		};
+		if (!("IntersectionObserver" in window)) {
+			hydrate();
+			return;
+		}
+		const observer = new IntersectionObserver((entries) => {
+			if (!entries.some((entry) => entry.isIntersecting)) return;
+			observer.disconnect();
+			hydrate();
+		});
+		observer.observe(layer);
+		cleanups.push(() => observer.disconnect());
+	}
+
 	function initHomeDataLayer() {
 		cleanupHomeDataLayer();
 		const layer = document.getElementById("home-data-layer");
 		if (!layer) return;
 		const token = ++guideOpeningToken;
+		initDeferredImages(layer);
 		initVisitStats(layer);
 		initMetricCards(layer);
 		initGuideRotators(layer);

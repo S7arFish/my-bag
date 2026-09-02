@@ -5,7 +5,8 @@ import {
 	SYSTEM_MODE,
 } from "@constants/constants";
 import type { LIGHT_DARK_MODE } from "@/types/config";
-import { expressiveCodeConfig, siteConfig } from "../config";
+import { expressiveCodeConfig } from "../config/expressiveCodeConfig";
+import { siteConfig } from "../config/siteConfig";
 
 type ViewTransitionHandle = {
 	finished?: Promise<unknown>;

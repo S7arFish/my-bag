@@ -27,6 +27,8 @@ export type SiteConfig = {
 
 	// 站点开始日期，用于计算运行天数
 	siteStartDate?: string; // 格式: "YYYY-MM-DD"
+	// 站点最近一次更新日期；配置后用于页脚重新开始计算更新时间
+	siteLastUpdateDate?: string; // 格式: "YYYY-MM-DD"
 
 	// 可选：站点时区，使用 IANA 时区标识，例如 "Asia/Shanghai"、"UTC"
 	timezone?: string;
@@ -202,8 +204,11 @@ export type HomePortfolioShutterPanel = {
 };
 
 export type HomePortfolioShutterInterlude = {
-	/** 前景大图（仅显示上半部分） */
-	foreground: string;
+	/** 左右两张前景人物图 */
+	foregrounds: {
+		left: string;
+		right: string;
+	};
 	/** 背景左侧滑入长条（从左向右） */
 	stripLeft: string;
 	/** 背景右侧滑入长条（从右向左） */
@@ -709,6 +714,7 @@ export type FriendLink = {
 	imgurl: string; // 头像图片URL
 	desc: string; // 友链描述
 	siteurl: string; // 友链地址
+	friendPageUrl?: string; // 对方展示本站链接的友链页，用于每日反链巡检
 	tags?: string[]; // 标签数组
 	weight: number; // 权重，数字越大排序越靠前
 	enabled: boolean; // 是否启用
@@ -784,6 +790,14 @@ export type MusicPlayerConfig = {
 			cover?: string; // 封面图片路径（相对于 public 目录）
 			lrc?: string; // 歌词内容，支持 LRC 格式
 		}>;
+		overrides?: Record<
+			string,
+			{
+				url: string; // 本地音频路径；键使用 Meting 返回的歌曲 ID 或精确歌名
+				cover?: string; // 可选：覆盖在线封面
+				lrc?: string; // 可选：覆盖在线歌词
+			}
+		>;
 	};
 
 	visualizer?: MusicVisualizerConfig;

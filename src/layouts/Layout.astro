@@ -1,4 +1,5 @@
 ---
+import FirstPartyAnalytics from "@components/analytics/FirstPartyAnalytics.astro";
 import GoogleAnalytics from "@components/analytics/GoogleAnalytics.astro";
 import La51Analytics from "@components/analytics/La51Analytics.astro";
 import MicrosoftClarity from "@components/analytics/MicrosoftClarity.astro";
@@ -114,6 +115,7 @@ const siteLang = lang.replace("_", "-");
         relpays={siteConfig.analytics.umamiAnalytics.relpays}
       />
     )}
+    {!siteConfig.analytics?.umamiAnalytics?.websiteId && <FirstPartyAnalytics />}
     {siteConfig.analytics?.la51Analytics?.Id && (
       <La51Analytics
         analyticsId={siteConfig.analytics.la51Analytics.Id}
@@ -371,7 +373,8 @@ const siteLang = lang.replace("_", "-");
 <script>
 	import { ArticleOutlineRailRuntime } from "@/utils/article-outline-controller";
 	import { installLazyCollapsibleCodeController } from "@/utils/lazy-collapsible-code-controller";
-  import { expressiveCodeConfig, siteConfig } from "@/config";
+  import { expressiveCodeConfig } from "@/config/expressiveCodeConfig";
+  import { siteConfig } from "@/config/siteConfig";
 
 	installLazyCollapsibleCodeController();
 

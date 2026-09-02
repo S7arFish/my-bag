@@ -19,17 +19,12 @@ describe("refractive raster maps", () => {
 		const centerX = Math.floor(map.width / 2);
 		const centerY = Math.floor(map.height / 2);
 		const center = (centerY * map.width + centerX) * 4;
-		expect([...map.data.slice(center, center + 4)]).toEqual([
-			128, 128, 0, 255,
-		]);
+		expect([...map.data.slice(center, center + 4)]).toEqual([128, 128, 0, 255]);
 
 		const left = (centerY * map.width + 2) * 4;
 		const right = (centerY * map.width + map.width - 3) * 4;
 		expect(Math.abs(map.data[left]! - 128)).toBeGreaterThan(0);
-		expect(map.data[left]! - 128).toBeCloseTo(
-			-(map.data[right]! - 128),
-			0,
-		);
+		expect(map.data[left]! - 128).toBeCloseTo(-(map.data[right]! - 128), 0);
 		expect(map.data[left + 1]).toBeCloseTo(map.data[right + 1]!, 0);
 	});
 

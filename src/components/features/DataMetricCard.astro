@@ -31,6 +31,8 @@ const {
 	statKind,
 	visualImage,
 } = Astro.props;
+const transparentPixel =
+	"data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==";
 ---
 
 <article
@@ -46,7 +48,7 @@ const {
 	<div class="data-card__frame"></div>
 	<div class:list={["data-card__visual", visualImage && "data-card__visual--image"]} aria-hidden="true">
 		{visualImage ? (
-			<img src={visualImage} alt="" class="data-card__visual-img" data-home-motion-image loading="lazy" decoding="async" />
+			<img src={transparentPixel} data-home-data-src={visualImage} alt="" class="data-card__visual-img" data-home-motion-image decoding="async" />
 		) : (
 			<svg viewBox="0 0 400 260" class="data-card__svg">
 				<path class="data-card__svg-path" d="M20 210 C 90 120, 150 260, 230 146 S 340 90, 382 38" />

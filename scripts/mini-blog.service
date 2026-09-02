@@ -1,0 +1,16 @@
+[Unit]
+Description=MiNi personal blog with anonymous visit statistics
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/home/xhj/apps/mini-blog/current
+ExecStart=/usr/bin/python3 /home/xhj/apps/mini-blog/current/scripts/blog_server.py --root /home/xhj/apps/mini-blog/current/dist --data /home/xhj/apps/mini-blog/data --host 127.0.0.1 --port 4322
+Restart=on-failure
+RestartSec=3
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=default.target

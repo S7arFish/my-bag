@@ -46,6 +46,7 @@
     "scripts/ai-search/**/*.ts"
   ],
   "exclude": [
-    "dist"
+    "dist",
+    "src/个人博客4.0/**"
   ]
 }

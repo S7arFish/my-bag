@@ -1,4 +1,4 @@
-import { siteConfig } from "../config";
+import { siteConfig } from "../config/siteConfig";
 
 const localeMap: Record<string, string> = {
 	zh_CN: "zh-CN",

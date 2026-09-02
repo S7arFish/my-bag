@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { springIsSettled, stepSpring, type SpringState } from "./spring";
+import { type SpringState, springIsSettled, stepSpring } from "./spring";
 
 const config = { mass: 1, stiffness: 190, damping: 15.5 };
 

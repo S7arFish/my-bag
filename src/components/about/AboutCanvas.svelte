@@ -8,6 +8,7 @@ import {
 	prepareWithSegments,
 } from "@chenglou/pretext";
 import { onDestroy, onMount } from "svelte";
+import { computeLiquidGlassOrbStyle } from "@/utils/about/liquid-glass";
 import {
 	hitTestLink,
 	type LinkHitArea,
@@ -23,12 +24,11 @@ import {
 	stepPhysics,
 	updateDragVelocity,
 } from "@/utils/about/reflow-engine";
-import { computeLiquidGlassOrbStyle } from "@/utils/about/liquid-glass";
 import {
 	attachRefractiveFilter,
 	type RefractiveFilterController,
 } from "@/utils/refractive/filter-controller";
-import { stepSpring, type SpringState } from "@/utils/refractive/spring";
+import { type SpringState, stepSpring } from "@/utils/refractive/spring";
 
 // ===== Props =====
 let { text = "" } = $props<{ text: string }>();
@@ -96,7 +96,9 @@ function hitTest(mx: number, my: number): boolean {
 function syncGlassShell(deltaSeconds = 1 / 60) {
 	if (!glassShell) return;
 	const style = computeLiquidGlassOrbStyle(ball, drag, dpr);
-	const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+	const reducedMotion = window.matchMedia(
+		"(prefers-reduced-motion: reduce)",
+	).matches;
 	if (reducedMotion) {
 		orbScaleX = { position: 1, velocity: 0 };
 		orbScaleY = { position: 1, velocity: 0 };

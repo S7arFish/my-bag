@@ -13,7 +13,7 @@ export const siteConfig: SiteConfig = {
 	subtitle: "MiNi飞飞",
 
 	// 站点 URL
-	site_url: "https://tblog.mmzhiku.xyz",
+	site_url: "https://lolicon.meme",
 
 	// 站点描述
 	description: "mini飞飞的博客，记录个人学习、工作、AI相关的内容",
@@ -107,7 +107,7 @@ export const siteConfig: SiteConfig = {
 		// 4. 网络图片: { type: "url", value: "https://example.com/logo.png", alt: "Logo" }
 		logo: {
 			type: "image",
-			value: "assets/images/logo.png",
+			value: "assets/images/logo-home-avatar.png",
 			alt: "logo",
 		},
 		// 导航栏标题
@@ -117,7 +117,10 @@ export const siteConfig: SiteConfig = {
 	},
 
 	// 站点开始日期，用于统计运行天数
-	siteStartDate: "2026-05-07",
+	siteStartDate: "2026-08-30",
+
+	// 本次重新部署的更新时间基准，页脚从“1 天前”重新计时
+	siteLastUpdateDate: "2026-08-29",
 
 	// 站点时区（IANA 时区字符串），用于格式化bangumi、rss里的构建日期时间等等..
 	// 示例："Asia/Shanghai", "UTC", 如果为空，则按照构建服务器的时区进行时区转换
